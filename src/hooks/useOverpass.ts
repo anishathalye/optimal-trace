@@ -18,7 +18,7 @@ interface UseOverpassResult {
   trails: GeoJSONFeatureCollection | null;
   loading: boolean;
   error: string | null;
-  fetch: (bbox: Bbox) => void;
+  fetch: (bbox: Bbox, includeRoads: boolean) => void;
   clear: () => void;
 }
 
@@ -28,7 +28,7 @@ export function useOverpass(): UseOverpassResult {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchFn = useCallback(async (bbox: Bbox) => {
+  const fetchFn = useCallback(async (bbox: Bbox, includeRoads: boolean) => {
     if (abortRef.current) {
       abortRef.current.abort();
     }
@@ -40,7 +40,7 @@ export function useOverpass(): UseOverpassResult {
     setError(null);
 
     try {
-      const raw = await fetchTrails(bbox);
+      const raw = await fetchTrails(bbox, includeRoads, controller.signal);
       const geojson = osmtogeojson(raw) as unknown as GeoJSONFeatureCollection;
       setTrails(geojson);
     } catch (err: unknown) {

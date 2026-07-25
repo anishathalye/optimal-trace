@@ -160,3 +160,20 @@
   color: #c0392b;
   margin: 0;
 }
+
+.sidebar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a6fa5;
+  cursor: pointer;
+}

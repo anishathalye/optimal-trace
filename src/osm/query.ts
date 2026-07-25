@@ -1,7 +1,7 @@
 const OVERPASS_URLS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
 ];
 
 export interface Bbox {
@@ -11,48 +11,55 @@ export interface Bbox {
   east: number;
 }
 
-function buildQuery(bbox: Bbox): string {
+function buildQuery(bbox: Bbox, includeRoads: boolean): string {
   const { south, west, north, east } = bbox;
+  const bboxStr = `(${south},${west},${north},${east})`;
+
+  const trailValues = 'path|footway|track|bridleway|steps|cycleway';
+  const roadValues = 'residential|unclassified|tertiary|service|living_street|pedestrian';
+
+  const values = includeRoads ? `${trailValues}|${roadValues}` : trailValues;
+
   return (
     `[out:json][timeout:90];\n` +
-    `way["highway"~"^(path|footway|track|bridleway|steps|cycleway)$"]` +
-    `(${south},${west},${north},${east});\n` +
+    `way["highway"~"^(${values})$"]${bboxStr};\n` +
     `out geom;`
   );
 }
 
-export async function fetchTrails(bbox: Bbox): Promise<Record<string, unknown>> {
-  const query = buildQuery(bbox);
+export async function fetchTrails(
+  bbox: Bbox,
+  includeRoads = false,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
+  const query = buildQuery(bbox, includeRoads);
+  const encoded = encodeURIComponent(query);
 
   let lastError: Error | null = null;
 
   for (const url of OVERPASS_URLS) {
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query),
+      const response = await fetch(`${url}?data=${encoded}`, {
+        signal,
       });
 
-      if (response.ok) {
-        return await response.json();
-      }
-
-      if (response.status === 429) {
-        lastError = new Error('Too many requests. Please wait a moment and try again.');
+      if (!response.ok) {
+        if (response.status === 429) {
+          lastError = new Error('Too many requests. Please wait a moment.');
+          continue;
+        }
+        if (response.status === 504) {
+          lastError = new Error('Server timed out. Try a smaller area.');
+          continue;
+        }
+        lastError = new Error(`Server error (${response.status}).`);
         continue;
       }
 
-      if (response.status === 504) {
-        lastError = new Error('The query timed out. Try selecting a smaller area or try again later.');
-        continue;
-      }
-
-      lastError = new Error(`Request failed (${response.status}). Please try again.`);
-      continue;
+      return await response.json();
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error('Network error. Please check your connection and try again.');
-      continue;
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      lastError = new Error('Could not reach the Overpass API. Check your connection or try again later.');
     }
   }
 

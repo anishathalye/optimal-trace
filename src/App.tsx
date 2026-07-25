@@ -49,6 +49,7 @@ function formatDistance(meters: number): string {
 function App() {
   const [drawing, setDrawing] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
+  const [includeRoads, setIncludeRoads] = useState(false);
   const [center, setCenter] = useState<[number, number]>(() => {
     const cached = loadCachedView();
     return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
@@ -89,12 +90,22 @@ function App() {
   }, [clearTrails]);
 
   const handleFetchTrails = useCallback(() => {
-    if (bbox) fetchTrails(bbox);
-  }, [bbox, fetchTrails]);
+    if (bbox) fetchTrails(bbox, includeRoads);
+  }, [bbox, includeRoads, fetchTrails]);
 
   const handleClearTrails = useCallback(() => {
     clearTrails();
   }, [clearTrails]);
+
+  const handleIncludeRoadsChange = useCallback(
+    (checked: boolean) => {
+      setIncludeRoads(checked);
+      if (bbox && trails) {
+        fetchTrails(bbox, checked);
+      }
+    },
+    [bbox, trails, fetchTrails]
+  );
 
   const trailDist = trails ? trailDistance(trails) : 0;
   const numTrails = trails ? trailCount(trails) : 0;
@@ -156,6 +167,17 @@ function App() {
                 ~{Math.round(bboxArea(bbox) / 1_000_000).toLocaleString()} km²
               </p>
             </div>
+          )}
+
+          {bbox && (
+            <label className="sidebar-checkbox">
+              <input
+                type="checkbox"
+                checked={includeRoads}
+                onChange={(e) => handleIncludeRoadsChange(e.target.checked)}
+              />
+              <span>Include roads</span>
+            </label>
           )}
 
           {bbox && !trails && !loading && (
