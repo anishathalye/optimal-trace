@@ -1,7 +1,30 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import MapView from './components/MapView';
 import type { Bbox } from './components/DrawControl';
+
+const VIEW_KEY = 'trail-trace-view';
+const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
+const DEFAULT_ZOOM = 11;
+
+interface CachedView {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
+function loadCachedView(): CachedView | null {
+  try {
+    const raw = localStorage.getItem(VIEW_KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      if (typeof v.lat === 'number' && typeof v.lng === 'number' && typeof v.zoom === 'number') {
+        return v;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
 
 function formatCoord(value: number): string {
   return value.toFixed(6);
@@ -17,6 +40,28 @@ function bboxArea(bbox: Bbox): number {
 function App() {
   const [drawing, setDrawing] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
+  const [center, setCenter] = useState<[number, number]>(() => {
+    const cached = loadCachedView();
+    return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
+  });
+  const [zoom, setZoom] = useState(() => {
+    const cached = loadCachedView();
+    return cached?.zoom ?? DEFAULT_ZOOM;
+  });
+
+  useEffect(() => {
+    if (loadCachedView()) return;
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        setZoom(13);
+      },
+      () => { /* silently ignore */ },
+      { timeout: 5000, maximumAge: 300000 }
+    );
+  }, []);
 
   const handleDrawEnd = useCallback((newBbox: Bbox) => {
     setBbox(newBbox);
@@ -39,7 +84,13 @@ function App() {
       </header>
       <div className="app-main">
         <div className="map-area">
-          <MapView drawing={drawing} bbox={bbox} onDrawEnd={handleDrawEnd} />
+          <MapView
+            drawing={drawing}
+            bbox={bbox}
+            onDrawEnd={handleDrawEnd}
+            center={center}
+            zoom={zoom}
+          />
         </div>
         <aside className="sidebar">
           <h2>Controls</h2>
