@@ -1,0 +1,32 @@
+.locate-button {
+  position: absolute;
+  top: 80px;
+  left: 10px;
+  z-index: 1000;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  color: #333;
+  padding: 0;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.15);
+  transition: background 0.2s;
+}
+
+.locate-button:hover {
+  background: #f2f2f2;
+}
+
+.locate-button:disabled {
+  cursor: default;
+}
+
+.locate-button.locating {
+  color: #4a6fa5;
+  cursor: wait;
+}
