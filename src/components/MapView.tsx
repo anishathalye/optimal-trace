@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -8,7 +8,9 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import LocateButton from './LocateButton';
 import DrawControl, { type Bbox } from './DrawControl';
 import TrailLayer from './TrailLayer';
+import GraphDebugLayer from './GraphDebugLayer';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
+import type { Graph } from '../graph/types';
 
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl;
 
@@ -49,11 +51,39 @@ function MapPersistence() {
 
 function MapViewSync({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
-
   useEffect(() => {
     map.setView(center, zoom);
   }, [map, center, zoom]);
+  return null;
+}
 
+function StartPointPicker({
+  active,
+  graph,
+  onSelect,
+}: {
+  active: boolean;
+  graph: Graph | null;
+  onSelect: (nodeId: string) => void;
+}) {
+  useMapEvents({
+    click(e: L.LeafletMouseEvent) {
+      if (!active || !graph) return;
+
+      let bestId = '';
+      let bestDist = Infinity;
+      for (const [id, node] of graph.nodes) {
+        const dLat = node.lat - e.latlng.lat;
+        const dLng = node.lng - e.latlng.lng;
+        const dist = dLat * dLat + dLng * dLng;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = id;
+        }
+      }
+      if (bestId) onSelect(bestId);
+    },
+  });
   return null;
 }
 
@@ -61,18 +91,31 @@ interface MapViewProps {
   drawing: boolean;
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
+  graph: Graph | null;
+  showDebug: boolean;
+  startNodeId: string | null;
+  selectingStart: boolean;
   onDrawEnd: (bbox: Bbox) => void;
   onFeatureClick: (featureId: string) => void;
+  onStartNodeSelected: (nodeId: string) => void;
   center: [number, number];
   zoom: number;
 }
 
-function MapView({ drawing, bbox, trails, onDrawEnd, onFeatureClick, center, zoom }: MapViewProps) {
+function MapView({
+  drawing, bbox, trails, graph, showDebug, startNodeId,
+  selectingStart, onDrawEnd, onFeatureClick, onStartNodeSelected,
+  center, zoom,
+}: MapViewProps) {
+  const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
+
+  const startNode = startNodeId && graph ? graph.nodes.get(startNodeId) : null;
+
   return (
     <MapContainer
       center={center}
       zoom={zoom}
-      style={{ width: '100%', height: '100%', cursor: drawing ? 'crosshair' : '' }}
+      style={{ width: '100%', height: '100%', cursor }}
       zoomControl={true}
     >
       <TileLayer
@@ -82,11 +125,23 @@ function MapView({ drawing, bbox, trails, onDrawEnd, onFeatureClick, center, zoo
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
       {trails && (
-        <TrailLayer
-          trails={trails}
-          onFeatureClick={onFeatureClick}
+        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} />
+      )}
+      {graph && (
+        <GraphDebugLayer graph={graph} showNodes={showDebug} showEdges={showDebug} />
+      )}
+      {startNode && (
+        <Marker
+          position={[startNode.lat, startNode.lng]}
+          icon={L.divIcon({
+            className: 'start-marker',
+            html: '<div style="background:#22c55e;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4)"></div>',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          })}
         />
       )}
+      <StartPointPicker active={selectingStart} graph={graph} onSelect={onStartNodeSelected} />
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>

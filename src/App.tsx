@@ -5,6 +5,9 @@ import type { Bbox } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
 import { trailDistance, trailCount, filterByMinLength } from './utils/geo';
+import buildGraph from './graph/build';
+import type { Graph } from './graph/types';
+import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
 
 const VIEW_KEY = 'trail-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
@@ -67,6 +70,11 @@ function App() {
   const [includeRoads, setIncludeRoads] = useState(false);
   const [minLength, setMinLength] = useState(0);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [graph, setGraph] = useState<Graph | null>(null);
+  const [buildingGraph, setBuildingGraph] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [selectingStart, setSelectingStart] = useState(false);
+  const [startNodeId, setStartNodeId] = useState<string | null>(null);
   const [center, setCenter] = useState<[number, number]>(() => {
     const cached = loadCachedView();
     return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
@@ -94,12 +102,26 @@ function App() {
 
   const trails = useMemo<GeoJSONFeatureCollection | null>(() => {
     if (!rawTrails) return null;
-    let filtered = filterByMinLength(rawTrails.features, minLength * 0.3048);
+    let filtered = filterByMinLength(rawTrails.features, minLength);
     if (removedIds.size > 0) {
       filtered = filtered.filter((f) => !f.id || !removedIds.has(f.id));
     }
     return { type: 'FeatureCollection', features: filtered };
   }, [rawTrails, minLength, removedIds]);
+
+  const graphStats = useMemo(() => {
+    if (!graph) return null;
+    const components = connectedComponents(graph);
+    const odd = oddDegreeNodes(graph);
+    const dist = totalEdgeDistance(graph);
+    return {
+      nodes: graph.nodes.size,
+      edges: graph.edges.length,
+      oddDegree: odd.length,
+      components: components.length,
+      distance: dist,
+    };
+  }, [graph]);
 
   const handleDrawEnd = useCallback((newBbox: Bbox) => {
     setBbox(newBbox);
@@ -113,18 +135,24 @@ function App() {
   const handleClearBbox = useCallback(() => {
     setBbox(null);
     setRemovedIds(new Set());
+    setGraph(null);
+    setStartNodeId(null);
     clearTrails();
   }, [clearTrails]);
 
   const handleFetchTrails = useCallback(() => {
     if (bbox) {
       setRemovedIds(new Set());
+      setGraph(null);
+      setStartNodeId(null);
       fetchTrails(bbox, includeRoads);
     }
   }, [bbox, includeRoads, fetchTrails]);
 
   const handleClearTrails = useCallback(() => {
     setRemovedIds(new Set());
+    setGraph(null);
+    setStartNodeId(null);
     clearTrails();
   }, [clearTrails]);
 
@@ -133,6 +161,8 @@ function App() {
       setIncludeRoads(checked);
       if (bbox && rawTrails) {
         setRemovedIds(new Set());
+        setGraph(null);
+        setStartNodeId(null);
         fetchTrails(bbox, checked);
       }
     },
@@ -145,14 +175,44 @@ function App() {
       next.add(featureId);
       return next;
     });
+    setGraph(null);
+    setStartNodeId(null);
   }, []);
 
   const handleRestoreRemoved = useCallback(() => {
     setRemovedIds(new Set());
+    setGraph(null);
+    setStartNodeId(null);
   }, []);
 
   const handleMinLengthChange = useCallback((value: number) => {
     setMinLength(value);
+    setGraph(null);
+    setStartNodeId(null);
+  }, []);
+
+  const handleBuildGraph = useCallback(() => {
+    if (!trails) return;
+    setBuildingGraph(true);
+    setTimeout(() => {
+      try {
+        const g = buildGraph(trails.features);
+        setGraph(g);
+        setStartNodeId(null);
+      } catch (err) {
+        console.error('Graph build failed:', err);
+      }
+      setBuildingGraph(false);
+    }, 0);
+  }, [trails]);
+
+  const handleToggleSelectStart = useCallback(() => {
+    setSelectingStart((prev) => !prev);
+  }, []);
+
+  const handleStartNodeSelected = useCallback((nodeId: string) => {
+    setStartNodeId(nodeId);
+    setSelectingStart(false);
   }, []);
 
   const trailDist = trails ? trailDistance(trails) : 0;
@@ -170,8 +230,13 @@ function App() {
             drawing={drawing}
             bbox={bbox}
             trails={trails}
+            graph={graph}
+            showDebug={showDebug}
+            startNodeId={startNodeId}
+            selectingStart={selectingStart}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
+            onStartNodeSelected={handleStartNodeSelected}
             center={center}
             zoom={zoom}
           />
@@ -286,16 +351,14 @@ function App() {
                 </dl>
               </div>
 
-              <div className="sidebar-section">
-                <button className="btn btn-secondary" onClick={handleClearTrails}>
-                  Clear Trails
+              <button className="btn btn-secondary" onClick={handleClearTrails}>
+                Clear Trails
+              </button>
+              {removedIds.size > 0 && (
+                <button className="btn btn-secondary" onClick={handleRestoreRemoved}>
+                  Restore {removedIds.size} removed
                 </button>
-                {removedIds.size > 0 && (
-                  <button className="btn btn-secondary" onClick={handleRestoreRemoved}>
-                    Restore {removedIds.size} removed
-                  </button>
-                )}
-              </div>
+              )}
             </>
           )}
 
@@ -303,6 +366,70 @@ function App() {
             <p className="sidebar-hint">
               Click a trail segment on the map to remove it.
             </p>
+          )}
+
+          {trails && !graph && !buildingGraph && (
+            <button className="btn btn-primary" onClick={handleBuildGraph}>
+              Build Graph
+            </button>
+          )}
+
+          {buildingGraph && (
+            <div className="sidebar-section">
+              <p className="sidebar-loading">Building graph&hellip;</p>
+            </div>
+          )}
+
+          {graph && graphStats && (
+            <>
+              <div className="sidebar-section">
+                <h3>Graph</h3>
+                <dl className="bbox-list">
+                  <dt>Nodes</dt>
+                  <dd>{graphStats.nodes}</dd>
+                  <dt>Edges</dt>
+                  <dd>{graphStats.edges}</dd>
+                  <dt>Odd-degree</dt>
+                  <dd>{graphStats.oddDegree}</dd>
+                  <dt>Components</dt>
+                  <dd>{graphStats.components}</dd>
+                  <dt>Total distance</dt>
+                  <dd>{formatDistance(graphStats.distance)}</dd>
+                </dl>
+              </div>
+
+              <div className="sidebar-section">
+                <label className="sidebar-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={showDebug}
+                    onChange={(e) => setShowDebug(e.target.checked)}
+                  />
+                  <span>Show graph debug</span>
+                </label>
+              </div>
+
+              <div className="sidebar-section">
+                <button
+                  className={`btn ${selectingStart ? 'btn-active' : ''}`}
+                  onClick={handleToggleSelectStart}
+                >
+                  {selectingStart ? 'Click map to set start\u2026' : 'Set Start Point'}
+                </button>
+                {startNodeId && (
+                  <p className="sidebar-note">
+                    Start point set.
+                    {graph.nodes.get(startNodeId)?.lat !== undefined && (
+                      <>
+                        {' '}
+                        ({graph.nodes.get(startNodeId)!.lat.toFixed(5)},{' '}
+                        {graph.nodes.get(startNodeId)!.lng.toFixed(5)})
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           {!bbox && !rawTrails && (
