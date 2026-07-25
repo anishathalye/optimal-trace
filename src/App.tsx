@@ -9,6 +9,8 @@ import buildGraph from './graph/build';
 import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
 import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
+import { solveCPP, type CPPResult } from './solver/cpp';
+import { generateGPX, downloadGPX } from './export/gpx';
 
 const VIEW_KEY = 'trail-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
@@ -75,6 +77,8 @@ function App() {
   const [buildingGraph, setBuildingGraph] = useState(false);
   const [selectingStart, setSelectingStart] = useState(false);
   const [startNodeId, setStartNodeId] = useState<string | null>(null);
+  const [cppResult, setCppResult] = useState<CPPResult | null>(null);
+  const [solving, setSolving] = useState(false);
   const [center, setCenter] = useState<[number, number]>(() => {
     const cached = loadCachedView();
     return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
@@ -231,6 +235,30 @@ function App() {
     setSelectingStart(false);
   }, []);
 
+  const handleComputeRoute = useCallback(() => {
+    if (!logicalGraph || !startNodeId) return;
+    setSolving(true);
+    setTimeout(() => {
+      try {
+        const result = solveCPP(logicalGraph, startNodeId);
+        setCppResult(result);
+      } catch (err) {
+        console.error('CPP solve failed:', err);
+      }
+      setSolving(false);
+    }, 0);
+  }, [logicalGraph, startNodeId]);
+
+  const handleClearRoute = useCallback(() => {
+    setCppResult(null);
+  }, []);
+
+  const handleExportGPX = useCallback(() => {
+    if (!cppResult) return;
+    const gpx = generateGPX(cppResult.coords, 'Trail Trace Route');
+    downloadGPX(gpx, 'trail-trace-route.gpx');
+  }, [cppResult]);
+
   const trailDist = trails ? trailDistance(trails) : 0;
   const numTrails = trails ? trailCount(trails) : 0;
 
@@ -251,6 +279,7 @@ function App() {
             showDebug={showDebugGraph !== false}
             startNodeId={startNodeId}
             selectingStart={selectingStart}
+            routeCoords={cppResult?.coords ?? null}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
             onStartNodeSelected={handleStartNodeSelected}
@@ -456,6 +485,47 @@ function App() {
                   </p>
                 )}
               </div>
+
+              {startNodeId && !cppResult && !solving && (
+                <button className="btn btn-primary" onClick={handleComputeRoute}>
+                  Compute Route
+                </button>
+              )}
+
+              {solving && (
+                <div className="sidebar-section">
+                  <p className="sidebar-loading">Computing route&hellip;</p>
+                </div>
+              )}
+
+              {cppResult && (
+                <>
+                  <div className="sidebar-section">
+                    <h3>Route</h3>
+                    <dl className="bbox-list">
+                      <dt>Total distance</dt>
+                      <dd>{formatDistance(cppResult.totalDistance)}</dd>
+                      <dt>Unique trails</dt>
+                      <dd>{formatDistance(cppResult.uniqueDistance)}</dd>
+                      {cppResult.totalDistance > cppResult.uniqueDistance && (
+                        <>
+                          <dt>Retraced</dt>
+                          <dd>{formatDistance(cppResult.totalDistance - cppResult.uniqueDistance)}</dd>
+                        </>
+                      )}
+                    </dl>
+                  </div>
+
+                  <div className="sidebar-section">
+                    <button className="btn btn-primary" onClick={handleExportGPX}>
+                      Download GPX
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleClearRoute}>
+                      Clear Route
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
