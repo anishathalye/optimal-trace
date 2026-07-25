@@ -40,11 +40,25 @@ function bboxArea(bbox: Bbox): number {
   return Math.abs(latLen * lonLen);
 }
 
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(1)} km`;
+function formatArea(sqm: number): string {
+  const sqmi = sqm / 2_589_988;
+  if (sqmi >= 0.01) {
+    return `${sqmi.toFixed(1)} mi²`;
   }
-  return `${Math.round(meters)} m`;
+  const acres = sqm / 4046.86;
+  if (acres >= 0.01) {
+    return `${acres.toFixed(1)} acres`;
+  }
+  const sqft = sqm * 10.7639;
+  return `${Math.round(sqft).toLocaleString()} ft²`;
+}
+
+function formatDistance(meters: number): string {
+  const feet = meters * 3.28084;
+  if (feet >= 5280) {
+    return `${(feet / 5280).toFixed(1)} mi`;
+  }
+  return `${Math.round(feet).toLocaleString()} ft`;
 }
 
 function App() {
@@ -80,7 +94,7 @@ function App() {
 
   const trails = useMemo<GeoJSONFeatureCollection | null>(() => {
     if (!rawTrails) return null;
-    let filtered = filterByMinLength(rawTrails.features, minLength);
+    let filtered = filterByMinLength(rawTrails.features, minLength * 0.3048);
     if (removedIds.size > 0) {
       filtered = filtered.filter((f) => !f.id || !removedIds.has(f.id));
     }
@@ -199,7 +213,7 @@ function App() {
                 <dd>{formatCoord(bbox.west)}</dd>
               </dl>
               <p className="sidebar-note">
-                ~{Math.round(bboxArea(bbox) / 1_000_000).toLocaleString()} km²
+                ~{formatArea(bboxArea(bbox))}
               </p>
             </div>
           )}
@@ -241,8 +255,8 @@ function App() {
                   <input
                     type="range"
                     min={0}
-                    max={100}
-                    step={1}
+                    max={300}
+                    step={5}
                     value={minLength}
                     onChange={(e) => handleMinLengthChange(Number(e.target.value))}
                   />
@@ -250,11 +264,11 @@ function App() {
                     type="number"
                     className="slider-input"
                     min={0}
-                    step={0.1}
+                    step={5}
                     value={minLength}
                     onChange={(e) => handleMinLengthChange(Number(e.target.value))}
                   />
-                  <span className="slider-unit">m</span>
+                  <span className="slider-unit">ft</span>
                 </div>
               </label>
             </div>
