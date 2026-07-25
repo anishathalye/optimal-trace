@@ -6,6 +6,7 @@ import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
 import { trailDistance, trailCount, filterByMinLength } from './utils/geo';
 import buildGraph from './graph/build';
+import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
 import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
 
@@ -72,7 +73,6 @@ function App() {
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
   const [selectingStart, setSelectingStart] = useState(false);
   const [startNodeId, setStartNodeId] = useState<string | null>(null);
   const [center, setCenter] = useState<[number, number]>(() => {
@@ -111,17 +111,33 @@ function App() {
 
   const graphStats = useMemo(() => {
     if (!graph) return null;
-    const components = connectedComponents(graph);
-    const odd = oddDegreeNodes(graph);
-    const dist = totalEdgeDistance(graph);
+    const logical = pruneGraph(graph);
+    const components = connectedComponents(logical);
+    const odd = oddDegreeNodes(logical);
+    const dist = totalEdgeDistance(logical);
     return {
-      nodes: graph.nodes.size,
-      edges: graph.edges.length,
+      rawNodes: graph.nodes.size,
+      rawEdges: graph.edges.length,
+      nodes: logical.nodes.size,
+      edges: logical.edges.length,
       oddDegree: odd.length,
       components: components.length,
       distance: dist,
     };
   }, [graph]);
+
+  const logicalGraph = useMemo(() => {
+    if (!graph) return null;
+    return pruneGraph(graph);
+  }, [graph]);
+
+  const [showDebugGraph, setShowDebugGraph] = useState<'raw' | 'logical' | false>(false);
+  const debugGraph = useMemo<Graph | null>(() => {
+    if (!graph) return null;
+    if (showDebugGraph === 'raw') return graph;
+    if (showDebugGraph === 'logical') return logicalGraph;
+    return null;
+  }, [graph, logicalGraph, showDebugGraph]);
 
   const handleDrawEnd = useCallback((newBbox: Bbox) => {
     setBbox(newBbox);
@@ -230,8 +246,9 @@ function App() {
             drawing={drawing}
             bbox={bbox}
             trails={trails}
-            graph={graph}
-            showDebug={showDebug}
+            graph={debugGraph}
+            logicalGraph={logicalGraph}
+            showDebug={showDebugGraph !== false}
             startNodeId={startNodeId}
             selectingStart={selectingStart}
             onDrawEnd={handleDrawEnd}
@@ -385,9 +402,13 @@ function App() {
               <div className="sidebar-section">
                 <h3>Graph</h3>
                 <dl className="bbox-list">
-                  <dt>Nodes</dt>
+                  <dt>Raw nodes</dt>
+                  <dd>{graphStats.rawNodes}</dd>
+                  <dt>Raw edges</dt>
+                  <dd>{graphStats.rawEdges}</dd>
+                  <dt>Logical nodes</dt>
                   <dd>{graphStats.nodes}</dd>
-                  <dt>Edges</dt>
+                  <dt>Logical edges</dt>
                   <dd>{graphStats.edges}</dd>
                   <dt>Odd-degree</dt>
                   <dd>{graphStats.oddDegree}</dd>
@@ -399,13 +420,23 @@ function App() {
               </div>
 
               <div className="sidebar-section">
-                <label className="sidebar-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={showDebug}
-                    onChange={(e) => setShowDebug(e.target.checked)}
-                  />
-                  <span>Show graph debug</span>
+                <label className="sidebar-slider">
+                  <span>Debug overlay</span>
+                  <div className="slider-row">
+                    <select
+                      className="slider-input"
+                      style={{ width: '100%' }}
+                      value={showDebugGraph === false ? '' : showDebugGraph}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setShowDebugGraph(v === 'raw' || v === 'logical' ? v : false);
+                      }}
+                    >
+                      <option value="">Off</option>
+                      <option value="raw">Raw graph</option>
+                      <option value="logical">Logical graph</option>
+                    </select>
+                  </div>
                 </label>
               </div>
 
@@ -416,16 +447,12 @@ function App() {
                 >
                   {selectingStart ? 'Click map to set start\u2026' : 'Set Start Point'}
                 </button>
-                {startNodeId && (
+                {startNodeId && logicalGraph && logicalGraph.nodes.has(startNodeId) && (
                   <p className="sidebar-note">
                     Start point set.
-                    {graph.nodes.get(startNodeId)?.lat !== undefined && (
-                      <>
-                        {' '}
-                        ({graph.nodes.get(startNodeId)!.lat.toFixed(5)},{' '}
-                        {graph.nodes.get(startNodeId)!.lng.toFixed(5)})
-                      </>
-                    )}
+                    {' '}
+                    ({logicalGraph.nodes.get(startNodeId)!.lat.toFixed(5)},{' '}
+                    {logicalGraph.nodes.get(startNodeId)!.lng.toFixed(5)})
                   </p>
                 )}
               </div>

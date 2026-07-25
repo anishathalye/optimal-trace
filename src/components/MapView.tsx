@@ -92,6 +92,7 @@ interface MapViewProps {
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
   graph: Graph | null;
+  logicalGraph: Graph | null;
   showDebug: boolean;
   startNodeId: string | null;
   selectingStart: boolean;
@@ -103,13 +104,13 @@ interface MapViewProps {
 }
 
 function MapView({
-  drawing, bbox, trails, graph, showDebug, startNodeId,
+  drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
   selectingStart, onDrawEnd, onFeatureClick, onStartNodeSelected,
   center, zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
 
-  const startNode = startNodeId && graph ? graph.nodes.get(startNodeId) : null;
+  const startNode = startNodeId && logicalGraph ? logicalGraph.nodes.get(startNodeId) : null;
 
   return (
     <MapContainer
@@ -141,7 +142,7 @@ function MapView({
           })}
         />
       )}
-      <StartPointPicker active={selectingStart} graph={graph} onSelect={onStartNodeSelected} />
+      <StartPointPicker active={selectingStart} graph={logicalGraph} onSelect={onStartNodeSelected} />
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>
