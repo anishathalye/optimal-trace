@@ -1,5 +1,5 @@
 import type { Graph, Edge } from '../graph/types';
-import { oddDegreeNodes } from '../graph/utils';
+import { oddDegreeNodes, connectedComponents } from '../graph/utils';
 import { dijkstra, reconstructPath } from './dijkstra';
 import blossom from 'edmonds-blossom';
 
@@ -173,9 +173,17 @@ export interface CPPResult {
   coords: [number, number][];
   totalDistance: number;
   uniqueDistance: number;
+  warning: string | null;
 }
 
 export function solveCPP(graph: Graph, startNode: string): CPPResult {
+  const components = connectedComponents(graph);
+  let warning: string | null = null;
+  if (components.length > 1) {
+    const unreachable = components.length - 1;
+    warning = `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
+  }
+
   const oddNodes = oddDegreeNodes(graph);
 
   const allPairs = allPairsShortestPaths(graph, oddNodes);
@@ -238,5 +246,5 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
     uniqueDistance += edge.weight;
   }
 
-  return { circuit, coords, totalDistance, uniqueDistance };
+  return { circuit, coords, totalDistance, uniqueDistance, warning };
 }

@@ -157,6 +157,7 @@ function App() {
     setRemovedIds(new Set());
     setGraph(null);
     setStartNodeId(null);
+    setCppResult(null);
     clearTrails();
   }, [clearTrails]);
 
@@ -197,6 +198,7 @@ function App() {
     });
     setGraph(null);
     setStartNodeId(null);
+    setCppResult(null);
   }, []);
 
   const handleRestoreRemoved = useCallback(() => {
@@ -500,6 +502,12 @@ function App() {
 
               {cppResult && (
                 <>
+                  {cppResult.warning && (
+                    <div className="sidebar-section">
+                      <p className="sidebar-error">{cppResult.warning}</p>
+                    </div>
+                  )}
+
                   <div className="sidebar-section">
                     <h3>Route</h3>
                     <dl className="bbox-list">
