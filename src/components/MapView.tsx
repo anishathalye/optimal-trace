@@ -45,6 +45,16 @@ function MapPersistence() {
   return null;
 }
 
+function MapViewSync({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [map, center, zoom]);
+
+  return null;
+}
+
 interface MapViewProps {
   drawing: boolean;
   bbox: Bbox | null;
@@ -68,6 +78,7 @@ function MapView({ drawing, bbox, onDrawEnd, center, zoom }: MapViewProps) {
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
       <MapPersistence />
+      <MapViewSync center={center} zoom={zoom} />
     </MapContainer>
   );
 }
