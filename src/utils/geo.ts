@@ -13,31 +13,41 @@ export function haversineDistance(
   return R * c;
 }
 
-export function trailDistance(
-  trails: {
-    features: Array<{
-      geometry: { type: string; coordinates: unknown };
-      properties: Record<string, unknown>;
-    }>;
+interface TrailFeature {
+  geometry: { type: string; coordinates: unknown };
+  properties: Record<string, unknown>;
+}
+
+function featureLength(feature: TrailFeature): number {
+  if (feature.geometry.type !== 'LineString') return 0;
+  const coords = feature.geometry.coordinates as [number, number][];
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    total += haversineDistance(coords[i - 1][1], coords[i - 1][0], coords[i][1], coords[i][0]);
   }
+  return total;
+}
+
+export function trailDistance(
+  trails: { features: TrailFeature[] }
 ): number {
   let total = 0;
-
   for (const feature of trails.features) {
-    const geom = feature.geometry;
-    if (geom.type !== 'LineString') continue;
-
-    const coords = geom.coordinates as [number, number][];
-    for (let i = 1; i < coords.length; i++) {
-      total += haversineDistance(coords[i - 1][1], coords[i - 1][0], coords[i][1], coords[i][0]);
-    }
+    total += featureLength(feature);
   }
-
   return total;
 }
 
 export function trailCount(
-  trails: { features: Array<{ geometry: { type: string } }> }
+  trails: { features: TrailFeature[] }
 ): number {
   return trails.features.filter((f) => f.geometry.type === 'LineString').length;
+}
+
+export function filterByMinLength<T extends TrailFeature>(
+  features: T[],
+  minLength: number
+): T[] {
+  if (minLength <= 0) return features;
+  return features.filter((f) => featureLength(f) >= minLength);
 }

@@ -2,16 +2,19 @@ import { useState, useCallback, useRef } from 'react';
 import { fetchTrails, type Bbox } from '../osm/query';
 import osmtogeojson from 'osmtogeojson';
 
+export interface GeoJSONFeature {
+  type: 'Feature';
+  id?: string;
+  geometry: {
+    type: string;
+    coordinates: unknown;
+  };
+  properties: Record<string, unknown>;
+}
+
 export interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';
-  features: Array<{
-    type: 'Feature';
-    geometry: {
-      type: string;
-      coordinates: unknown;
-    };
-    properties: Record<string, unknown>;
-  }>;
+  features: GeoJSONFeature[];
 }
 
 interface UseOverpassResult {

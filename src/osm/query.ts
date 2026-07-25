@@ -22,7 +22,7 @@ function buildQuery(bbox: Bbox, includeRoads: boolean): string {
 
   return (
     `[out:json][timeout:90];\n` +
-    `way["highway"~"^(${values})$"]${bboxStr};\n` +
+    `way["highway"~"^(${values})$"]["area"!~"^yes$"]${bboxStr};\n` +
     `out geom;`
   );
 }

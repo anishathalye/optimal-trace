@@ -62,11 +62,12 @@ interface MapViewProps {
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
   onDrawEnd: (bbox: Bbox) => void;
+  onFeatureClick: (featureId: string) => void;
   center: [number, number];
   zoom: number;
 }
 
-function MapView({ drawing, bbox, trails, onDrawEnd, center, zoom }: MapViewProps) {
+function MapView({ drawing, bbox, trails, onDrawEnd, onFeatureClick, center, zoom }: MapViewProps) {
   return (
     <MapContainer
       center={center}
@@ -80,7 +81,12 @@ function MapView({ drawing, bbox, trails, onDrawEnd, center, zoom }: MapViewProp
       />
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
-      {trails && <TrailLayer trails={trails} />}
+      {trails && (
+        <TrailLayer
+          trails={trails}
+          onFeatureClick={onFeatureClick}
+        />
+      )}
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>

@@ -177,3 +177,44 @@
   accent-color: #4a6fa5;
   cursor: pointer;
 }
+
+.sidebar-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #555;
+  user-select: none;
+}
+
+.sidebar-slider input[type='range'] {
+  flex: 1;
+  accent-color: #4a6fa5;
+  cursor: pointer;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-input {
+  width: 60px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: right;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.slider-input:focus {
+  outline: none;
+  border-color: #4a6fa5;
+}
+
+.slider-unit {
+  font-size: 13px;
+  color: #666;
+}
