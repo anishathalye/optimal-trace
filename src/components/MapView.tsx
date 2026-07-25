@@ -7,6 +7,8 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import LocateButton from './LocateButton';
 import DrawControl, { type Bbox } from './DrawControl';
+import TrailLayer from './TrailLayer';
+import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
 
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl;
 
@@ -58,12 +60,13 @@ function MapViewSync({ center, zoom }: { center: [number, number]; zoom: number 
 interface MapViewProps {
   drawing: boolean;
   bbox: Bbox | null;
+  trails: GeoJSONFeatureCollection | null;
   onDrawEnd: (bbox: Bbox) => void;
   center: [number, number];
   zoom: number;
 }
 
-function MapView({ drawing, bbox, onDrawEnd, center, zoom }: MapViewProps) {
+function MapView({ drawing, bbox, trails, onDrawEnd, center, zoom }: MapViewProps) {
   return (
     <MapContainer
       center={center}
@@ -77,6 +80,7 @@ function MapView({ drawing, bbox, onDrawEnd, center, zoom }: MapViewProps) {
       />
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
+      {trails && <TrailLayer trails={trails} />}
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>

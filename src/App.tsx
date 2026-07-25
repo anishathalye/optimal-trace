@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import MapView from './components/MapView';
 import type { Bbox } from './components/DrawControl';
+import { useOverpass } from './hooks/useOverpass';
+import { trailDistance, trailCount } from './utils/geo';
 
 const VIEW_KEY = 'trail-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
@@ -37,6 +39,13 @@ function bboxArea(bbox: Bbox): number {
   return Math.abs(latLen * lonLen);
 }
 
+function formatDistance(meters: number): string {
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(1)} km`;
+  }
+  return `${Math.round(meters)} m`;
+}
+
 function App() {
   const [drawing, setDrawing] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
@@ -48,6 +57,8 @@ function App() {
     const cached = loadCachedView();
     return cached?.zoom ?? DEFAULT_ZOOM;
   });
+
+  const { trails, loading, error, fetch: fetchTrails, clear: clearTrails } = useOverpass();
 
   useEffect(() => {
     if (loadCachedView()) return;
@@ -74,7 +85,19 @@ function App() {
 
   const handleClearBbox = useCallback(() => {
     setBbox(null);
-  }, []);
+    clearTrails();
+  }, [clearTrails]);
+
+  const handleFetchTrails = useCallback(() => {
+    if (bbox) fetchTrails(bbox);
+  }, [bbox, fetchTrails]);
+
+  const handleClearTrails = useCallback(() => {
+    clearTrails();
+  }, [clearTrails]);
+
+  const trailDist = trails ? trailDistance(trails) : 0;
+  const numTrails = trails ? trailCount(trails) : 0;
 
   return (
     <div className="app">
@@ -87,6 +110,7 @@ function App() {
           <MapView
             drawing={drawing}
             bbox={bbox}
+            trails={trails}
             onDrawEnd={handleDrawEnd}
             center={center}
             zoom={zoom}
@@ -115,7 +139,7 @@ function App() {
             </p>
           )}
 
-          {bbox ? (
+          {bbox && (
             <div className="sidebar-section">
               <h3>Selected Area</h3>
               <dl className="bbox-list">
@@ -132,7 +156,45 @@ function App() {
                 ~{Math.round(bboxArea(bbox) / 1_000_000).toLocaleString()} km²
               </p>
             </div>
-          ) : (
+          )}
+
+          {bbox && !trails && !loading && (
+            <button className="btn btn-primary" onClick={handleFetchTrails}>
+              Fetch Trails
+            </button>
+          )}
+
+          {loading && (
+            <div className="sidebar-section">
+              <p className="sidebar-loading">Fetching trails&hellip;</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="sidebar-section">
+              <p className="sidebar-error">{error}</p>
+            </div>
+          )}
+
+          {trails && (
+            <>
+              <div className="sidebar-section">
+                <h3>Trails</h3>
+                <dl className="bbox-list">
+                  <dt>Segments</dt>
+                  <dd>{numTrails}</dd>
+                  <dt>Distance</dt>
+                  <dd>{formatDistance(trailDist)}</dd>
+                </dl>
+              </div>
+
+              <button className="btn btn-secondary" onClick={handleClearTrails}>
+                Clear Trails
+              </button>
+            </>
+          )}
+
+          {!bbox && !trails && (
             <p className="sidebar-placeholder">
               Draw a rectangle on the map to select an area, then fetch trails.
               Select a starting point, and compute the optimal route covering every trail.

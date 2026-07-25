@@ -137,3 +137,26 @@
   background: #e9ecef;
   color: #333;
 }
+
+.btn-primary {
+  background: #4a6fa5;
+  color: #fff;
+  border-color: #3a5a8c;
+}
+
+.btn-primary:hover {
+  background: #3a5a8c;
+}
+
+.sidebar-loading {
+  font-size: 14px;
+  color: #4a6fa5;
+  margin: 0;
+  font-style: italic;
+}
+
+.sidebar-error {
+  font-size: 14px;
+  color: #c0392b;
+  margin: 0;
+}
