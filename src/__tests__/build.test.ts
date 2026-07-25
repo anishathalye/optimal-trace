@@ -42,6 +42,28 @@ describe('buildGraph', () => {
     expect(components.length).toBe(1);
   });
 
+  it('connects near-miss endpoints via point rounding', () => {
+    const features = [
+      makeFeature([[0, 0], [0.001, 0]]),
+      makeFeature([[0.00100008, 0.00000009], [0.001, 0.001]]),
+    ];
+    const graph = buildGraph(features);
+    const components = connectedComponents(graph);
+    expect(components.length).toBe(1);
+  });
+
+  it('splits multi-segment trail at crossing intersection', () => {
+    const features = [
+      makeFeature([[0, 0], [0.004, 0.002], [0.006, 0]]),
+      makeFeature([[0.003, -0.002], [0.003, 0.002]]),
+    ];
+    const graph = buildGraph(features);
+    const components = connectedComponents(graph);
+    expect(components.length).toBe(1);
+    expect(graph.nodes.size).toBeGreaterThanOrEqual(5);
+    expect(graph.edges.length).toBeGreaterThanOrEqual(4);
+  });
+
   it('builds connected graph for crossing trails', () => {
     const features = [
       makeFeature([[0, 0], [0.002, 0]]),
