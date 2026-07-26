@@ -355,7 +355,7 @@ function App() {
         <div className="map-area">
           <MapView
             drawing={drawing}
-            bbox={bbox}
+            bbox={rawTrails ? null : bbox}
             trails={displayTrails}
             graph={debugGraph}
             logicalGraph={logicalGraph}
