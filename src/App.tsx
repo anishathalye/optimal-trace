@@ -398,7 +398,6 @@ function App() {
         >
           {__COMMIT_HASH__}
         </a>
-
       </header>
       <div className="app-main">
         <div className="map-area">
