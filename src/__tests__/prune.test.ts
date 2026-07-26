@@ -91,4 +91,18 @@ describe('pruneGraph', () => {
     const pruned = pruneGraph(g);
     expect(pruned.nodes.has(junction1)).toBe(true);
   });
+
+  it('regression: preserves cycle when spoke attached', () => {
+    const g = makeGraph([
+      [[0, 0], [1, 0]],
+      [[1, 0], [1, 1]],
+      [[1, 1], [0, 1]],
+      [[0, 1], [0, 0]],
+      [[0, 0], [0.5, -0.5]],
+    ]);
+    const junction = pointKey(0, 0);
+    const pruned = pruneGraph(g);
+    expect(pruned.nodes.has(junction)).toBe(true);
+    expect(pruned.nodes.size).toBeGreaterThanOrEqual(3);
+  });
 });

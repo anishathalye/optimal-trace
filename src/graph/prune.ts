@@ -91,10 +91,11 @@ export function pruneGraph(input: Graph): Graph {
 
       if (neighbors.length !== 2) continue;
 
-      const n1 = neighbors[0];
-      const n2 = neighbors[1];
+      const [n1, n2] = neighbors;
 
       if (n1 === n2) continue;
+
+      if (graph.adjacency.get(n1)?.has(n2)) continue;
 
       const e1 = findEdge(graph, nodeId, n1);
       const e2 = findEdge(graph, nodeId, n2);
