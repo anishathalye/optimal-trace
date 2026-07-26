@@ -40,12 +40,6 @@ function EraserTool({ active, trails, onEraseStart, onEraseFeature }: EraserTool
     }
   }, [map, active]);
 
-  const radius = mouseLatlng
-    ? map.containerPointToLatLng(
-        map.latLngToContainerPoint(mouseLatlng).add([THRESHOLD_PX, 0])
-      ).distanceTo(mouseLatlng)
-    : 10;
-
   const eraseAt = useCallback(
     (latlng: L.LatLng) => {
       if (!trails) return;
@@ -92,7 +86,7 @@ function EraserTool({ active, trails, onEraseStart, onEraseFeature }: EraserTool
   return (
     <CircleMarker
       center={mouseLatlng}
-      radius={radius}
+      radius={THRESHOLD_PX}
       pathOptions={{
         color: '#e05a2a',
         fillColor: '#e05a2a',
