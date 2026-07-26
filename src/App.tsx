@@ -75,7 +75,7 @@ function formatDistance(meters: number): string {
 function App() {
   const [drawing, setDrawing] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
-  const [includeRoads, setIncludeRoads] = useState(false);
+  const [includeRoads, setIncludeRoads] = useState(true);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
   const [erasing, setErasing] = useState(false);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -382,7 +382,7 @@ function App() {
               className={`btn ${drawing ? 'btn-active' : ''}`}
               onClick={handleToggleDraw}
             >
-              {drawing ? 'Drawing\u2026 Click cancel' : 'Draw Rectangle'}
+              {drawing ? 'Drawing\u2026 Click cancel' : 'Select Area'}
             </button>
             {bbox && (
               <button className="btn btn-secondary" onClick={handleClearBbox}>
@@ -607,7 +607,7 @@ function App() {
 
           {!bbox && !rawTrails && (
             <p className="sidebar-placeholder">
-              Draw a rectangle on the map to select an area, then fetch trails.
+              Select an area on the map, then fetch trails.
               Select a starting point, and compute the optimal route covering every trail.
             </p>
           )}
