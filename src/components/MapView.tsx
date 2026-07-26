@@ -9,6 +9,7 @@ import LocateButton from './LocateButton';
 import DrawControl, { type Bbox } from './DrawControl';
 import TrailLayer from './TrailLayer';
 import GraphDebugLayer from './GraphDebugLayer';
+import EraserTool from './EraserTool';
 import RouteLayer from './RouteLayer';
 import type { RouteSegment } from '../solver/cpp';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
@@ -150,18 +151,22 @@ interface MapViewProps {
   showDebug: boolean;
   startNodeId: string | null;
   selectingStart: boolean;
+  erasing: boolean;
   routeSegments: RouteSegment[] | null;
   hoverPoint: { lat: number; lng: number } | null;
   onDrawEnd: (bbox: Bbox) => void;
   onFeatureClick: (featureId: string) => void;
   onStartNodeSelected: (lat: number, lng: number) => void;
+  onEraseStart: () => void;
+  onEraseFeature: (featureId: string) => void;
   center: [number, number];
   zoom: number;
 }
 
 function MapView({
   drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
-  selectingStart, routeSegments, hoverPoint, onDrawEnd, onFeatureClick, onStartNodeSelected,
+  selectingStart, erasing, routeSegments, hoverPoint, onDrawEnd, onFeatureClick,
+  onStartNodeSelected, onEraseStart, onEraseFeature,
   center, zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
@@ -182,7 +187,10 @@ function MapView({
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
       {trails && (
-        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart} />
+        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart || erasing} />
+      )}
+      {trails && (
+        <EraserTool active={erasing} trails={trails} onEraseStart={onEraseStart} onEraseFeature={onEraseFeature} />
       )}
       {routeSegments && <RouteLayer segments={routeSegments} />}
       {graph && (

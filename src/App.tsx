@@ -75,7 +75,8 @@ function App() {
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [includeRoads, setIncludeRoads] = useState(false);
   const [minLength, setMinLength] = useState(0);
-  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
+  const [erasing, setErasing] = useState(false);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
   const [selectingStart, setSelectingStart] = useState(false);
@@ -110,6 +111,14 @@ function App() {
       { timeout: 5000, maximumAge: 300000 }
     );
   }, []);
+
+  const removedIds = useMemo(() => {
+    const all = new Set<string>();
+    for (const batch of removedBatches) {
+      for (const id of batch) all.add(id);
+    }
+    return all;
+  }, [removedBatches]);
 
   const trails = useMemo<GeoJSONFeatureCollection | null>(() => {
     if (!rawTrails) return null;
@@ -168,7 +177,7 @@ function App() {
 
   const handleClearBbox = useCallback(() => {
     setBbox(null);
-    setRemovedIds(new Set());
+    setRemovedBatches([]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
@@ -178,7 +187,7 @@ function App() {
 
   const handleFetchTrails = useCallback(() => {
     if (bbox) {
-      setRemovedIds(new Set());
+      setRemovedBatches([]);
       setGraph(null);
       setStartLat(null);
       setStartLng(null);
@@ -187,7 +196,7 @@ function App() {
   }, [bbox, includeRoads, fetchTrails]);
 
   const handleClearTrails = useCallback(() => {
-    setRemovedIds(new Set());
+    setRemovedBatches([]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
@@ -198,7 +207,7 @@ function App() {
     (checked: boolean) => {
       setIncludeRoads(checked);
       if (bbox && rawTrails) {
-        setRemovedIds(new Set());
+        setRemovedBatches([]);
         setGraph(null);
         setStartLat(null);
         setStartLng(null);
@@ -209,11 +218,7 @@ function App() {
   );
 
   const handleFeatureClick = useCallback((featureId: string) => {
-    setRemovedIds((prev) => {
-      const next = new Set(prev);
-      next.add(featureId);
-      return next;
-    });
+    setRemovedBatches((prev) => [...prev, new Set([featureId])]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
@@ -221,10 +226,36 @@ function App() {
   }, []);
 
   const handleRestoreRemoved = useCallback(() => {
-    setRemovedIds(new Set());
+    setRemovedBatches([]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setRemovedBatches((prev) => prev.slice(0, -1));
+    setGraph(null);
+    setStartLat(null);
+    setStartLng(null);
+  }, []);
+
+  const handleEraseStart = useCallback(() => {
+    setRemovedBatches((prev) => [...prev, new Set<string>()]);
+  }, []);
+
+  const handleEraseFeature = useCallback((featureId: string) => {
+    setRemovedBatches((prev) => {
+      if (prev.length === 0) return prev;
+      const copy = [...prev];
+      const last = new Set(copy[copy.length - 1]);
+      last.add(featureId);
+      copy[copy.length - 1] = last;
+      return copy;
+    });
+    setGraph(null);
+    setStartLat(null);
+    setStartLng(null);
+    setCppResult(null);
   }, []);
 
   const handleMinLengthChange = useCallback((value: number) => {
@@ -318,11 +349,14 @@ function App() {
             showDebug={showDebugGraph !== false}
             startNodeId={startNodeId}
             selectingStart={selectingStart}
+            erasing={erasing}
             routeSegments={cppResult?.segments ?? null}
             hoverPoint={hoverPoint}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
             onStartNodeSelected={handleStartNodeSelected}
+            onEraseStart={handleEraseStart}
+            onEraseFeature={handleEraseFeature}
             center={center}
             zoom={zoom}
           />
@@ -437,18 +471,31 @@ function App() {
                 </dl>
               </div>
 
-              <button className="btn btn-secondary" onClick={handleClearTrails}>
-                Clear Trails
-              </button>
-              {removedIds.size > 0 && (
-                <button className="btn btn-secondary" onClick={handleRestoreRemoved}>
-                  Restore {removedIds.size} removed
+              <div className="sidebar-section">
+                <button className="btn btn-secondary" onClick={handleClearTrails}>
+                  Clear Trails
                 </button>
-              )}
+                <button
+                  className={`btn btn-secondary ${erasing ? 'btn-danger' : ''}`}
+                  onClick={() => setErasing((prev) => !prev)}
+                >
+                  {erasing ? 'Erasing\u2026 click to stop' : 'Erase'}
+                </button>
+                {removedBatches.length > 0 && (
+                  <button className="btn btn-secondary" onClick={handleUndo}>
+                    Undo
+                  </button>
+                )}
+                {removedIds.size > 0 && (
+                  <button className="btn btn-secondary" onClick={handleRestoreRemoved}>
+                    Restore all
+                  </button>
+                )}
+              </div>
             </>
           )}
 
-          {trails && (
+          {trails && !erasing && (
             <p className="sidebar-hint">
               Click a trail segment on the map to remove it.
             </p>

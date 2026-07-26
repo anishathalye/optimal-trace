@@ -128,6 +128,19 @@
   border-color: #3a5a8c;
 }
 
+.btn-danger,
+.btn.btn-danger,
+.btn-secondary.btn-danger {
+  background: #e05a2a !important;
+  color: #fff !important;
+  border-color: #c44d20;
+}
+.btn-danger:hover,
+.btn.btn-danger:hover {
+  background: #c44d20 !important;
+  color: #fff !important;
+}
+
 .btn-secondary {
   border-color: #ccc;
   color: #666;
