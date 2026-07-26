@@ -10,6 +10,7 @@ import DrawControl, { type Bbox } from './DrawControl';
 import TrailLayer from './TrailLayer';
 import GraphDebugLayer from './GraphDebugLayer';
 import RouteLayer from './RouteLayer';
+import type { RouteSegment } from '../solver/cpp';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
 import type { Graph } from '../graph/types';
 
@@ -97,7 +98,7 @@ interface MapViewProps {
   showDebug: boolean;
   startNodeId: string | null;
   selectingStart: boolean;
-  routeCoords: [number, number][] | null;
+  routeSegments: RouteSegment[] | null;
   hoverPoint: { lat: number; lng: number } | null;
   onDrawEnd: (bbox: Bbox) => void;
   onFeatureClick: (featureId: string) => void;
@@ -108,7 +109,7 @@ interface MapViewProps {
 
 function MapView({
   drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
-  selectingStart, routeCoords, hoverPoint, onDrawEnd, onFeatureClick, onStartNodeSelected,
+  selectingStart, routeSegments, hoverPoint, onDrawEnd, onFeatureClick, onStartNodeSelected,
   center, zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
@@ -131,7 +132,7 @@ function MapView({
       {trails && (
         <TrailLayer trails={trails} onFeatureClick={onFeatureClick} />
       )}
-      {routeCoords && <RouteLayer coords={routeCoords} />}
+      {routeSegments && <RouteLayer segments={routeSegments} />}
       {graph && (
         <GraphDebugLayer graph={graph} showNodes={showDebug} showEdges={showDebug} />
       )}

@@ -294,7 +294,7 @@ function App() {
             showDebug={showDebugGraph !== false}
             startNodeId={startNodeId}
             selectingStart={selectingStart}
-            routeCoords={cppResult?.coords ?? null}
+            routeSegments={cppResult?.segments ?? null}
             hoverPoint={hoverPoint}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
