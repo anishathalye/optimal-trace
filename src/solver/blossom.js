@@ -367,6 +367,7 @@ Edmonds.prototype.addBlossom = function (base, k) {
 };
 
 Edmonds.prototype.expandBlossom = function (b, endStage) {
+  var v;
   //console.log('DEBUG: expandBlossom(' + b + ',' + endStage + ') ' + this.blossomChilds[b].toString());
   for (var ii = 0; ii < this.blossomChilds[b].length; ii++) {
     var s = this.blossomChilds[b][ii];

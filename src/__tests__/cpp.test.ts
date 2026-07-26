@@ -93,4 +93,17 @@ describe('solveCPP', () => {
     const start = firstNode(g);
     expect(() => solveCPP(g, start)).not.toThrow();
   });
+
+  it('regression: expandBlossom path with six odd-degree nodes', () => {
+    const g = makeGraph([
+      [[0, 0], [0.001, 0]],
+      [[0.001, 0], [0.002, 0]],
+      [[0, 0.001], [0.001, 0.001]],
+      [[0.001, 0.001], [0.002, 0.001]],
+      [[0, 0.002], [0.001, 0.002]],
+      [[0.001, 0.002], [0.002, 0.002]],
+    ]);
+    const start = firstNode(g);
+    expect(() => solveCPP(g, start)).not.toThrow();
+  });
 });
