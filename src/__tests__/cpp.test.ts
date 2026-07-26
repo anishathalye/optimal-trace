@@ -106,4 +106,18 @@ describe('solveCPP', () => {
     const start = firstNode(g);
     expect(() => solveCPP(g, start)).not.toThrow();
   });
+
+  it('regression: retraced segments are marked in out-and-back', () => {
+    const g = makeGraph([
+      [[0, 0], [0.001, 0]],
+      [[0.001, 0], [0.002, 0]],
+    ]);
+    const start = firstNode(g);
+    const result = solveCPP(g, start);
+    const green = result.segments.filter((s) => !s.retraced);
+    const orange = result.segments.filter((s) => s.retraced);
+    expect(green.length).toBeGreaterThan(0);
+    expect(orange.length).toBeGreaterThan(0);
+    expect(result.segments.every((s) => s.coords.length >= 2)).toBe(true);
+  });
 });

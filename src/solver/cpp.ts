@@ -230,17 +230,18 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
       const segCoords: [number, number][] = [];
 
       if (isForward) {
+        segCoords.push(...edgeCoords);
         for (let j = 0; j < edgeCoords.length; j++) {
           if (coords.length === 0 || coords[coords.length - 1][0] !== edgeCoords[j][0] || coords[coords.length - 1][1] !== edgeCoords[j][1]) {
             coords.push(edgeCoords[j]);
-            segCoords.push(edgeCoords[j]);
           }
         }
       } else {
-        for (let j = edgeCoords.length - 1; j >= 0; j--) {
-          if (coords.length === 0 || coords[coords.length - 1][0] !== edgeCoords[j][0] || coords[coords.length - 1][1] !== edgeCoords[j][1]) {
-            coords.push(edgeCoords[j]);
-            segCoords.push(edgeCoords[j]);
+        const reversed = [...edgeCoords].reverse();
+        segCoords.push(...reversed);
+        for (let j = 0; j < reversed.length; j++) {
+          if (coords.length === 0 || coords[coords.length - 1][0] !== reversed[j][0] || coords[coords.length - 1][1] !== reversed[j][1]) {
+            coords.push(reversed[j]);
           }
         }
       }
