@@ -45,6 +45,14 @@ export function useOverpass(): UseOverpassResult {
     try {
       const raw = await fetchTrails(bbox, includeRoads, controller.signal);
       const geojson = osmtogeojson(raw) as unknown as GeoJSONFeatureCollection;
+
+      geojson.features = geojson.features.filter((f) => {
+        const t = f.properties;
+        if (t.area === 'yes') return false;
+        if (t.indoor === 'yes') return false;
+        return true;
+      });
+
       setTrails(geojson);
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
