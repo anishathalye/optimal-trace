@@ -1,7 +1,7 @@
 import type { Graph, Edge } from '../graph/types';
 import { oddDegreeNodes, connectedComponents } from '../graph/utils';
 import { dijkstra, reconstructPath } from './dijkstra';
-import blossom from './blossom.js';
+import blossom from './blossom';
 
 interface PathInfo {
   distance: number;
@@ -168,9 +168,15 @@ function buildEdgeIndex(graph: Graph): Map<string, Map<string, Edge>> {
   return index;
 }
 
+export interface RouteSegment {
+  coords: [number, number][];
+  retraced: boolean;
+}
+
 export interface CPPResult {
   circuit: string[];
   coords: [number, number][];
+  segments: RouteSegment[];
   totalDistance: number;
   uniqueDistance: number;
   warning: string | null;
@@ -206,6 +212,9 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
   const edgeIndex = buildEdgeIndex(graph);
 
   const coords: [number, number][] = [];
+  const segments: RouteSegment[] = [];
+  const traversed = new Set<string>();
+
   for (let i = 0; i < circuit.length - 1; i++) {
     const u = circuit[i];
     const v = circuit[i + 1];
@@ -213,21 +222,31 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
 
     if (edge) {
       const edgeCoords = edge.coords;
-      const isForward =
-        edge.from === u && edge.to === v;
+      const isForward = edge.from === u && edge.to === v;
+      const edgeKey = u < v ? `${u}|${v}` : `${v}|${u}`;
+      const retraced = traversed.has(edgeKey);
+      traversed.add(edgeKey);
+
+      const segCoords: [number, number][] = [];
 
       if (isForward) {
         for (let j = 0; j < edgeCoords.length; j++) {
           if (coords.length === 0 || coords[coords.length - 1][0] !== edgeCoords[j][0] || coords[coords.length - 1][1] !== edgeCoords[j][1]) {
             coords.push(edgeCoords[j]);
+            segCoords.push(edgeCoords[j]);
           }
         }
       } else {
         for (let j = edgeCoords.length - 1; j >= 0; j--) {
           if (coords.length === 0 || coords[coords.length - 1][0] !== edgeCoords[j][0] || coords[coords.length - 1][1] !== edgeCoords[j][1]) {
             coords.push(edgeCoords[j]);
+            segCoords.push(edgeCoords[j]);
           }
         }
+      }
+
+      if (segCoords.length >= 2) {
+        segments.push({ coords: segCoords, retraced });
       }
     }
   }
@@ -246,5 +265,5 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
     uniqueDistance += edge.weight;
   }
 
-  return { circuit, coords, totalDistance, uniqueDistance, warning };
+  return { circuit, coords, segments, totalDistance, uniqueDistance, warning };
 }
