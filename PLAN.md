@@ -1,4 +1,4 @@
-# Trail Trace — Implementation Plan
+# Optimal Trace — Implementation Plan
 
 A frontend-only web app for computing the Chinese Postman Problem (CPP) route over trail networks. Users select a rectangular area on a map, pick a starting point, and get an optimal route covering every trail segment.
 
@@ -10,7 +10,7 @@ A frontend-only web app for computing the Chinese Postman Problem (CPP) route ov
 
 **Objective:** Create the Vite + React + TypeScript project and install core dependencies.
 
-- `npm create vite@latest trail-trace -- --template react-ts`
+- `npm create vite@latest optimal-trace -- --template react-ts`
 - Install dependencies:
   ```
   react-leaflet leaflet @types/leaflet

@@ -23,7 +23,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const VIEW_KEY = 'trail-trace-view';
+const VIEW_KEY = 'optimal-trace-view';
 
 function MapPersistence() {
   const map = useMap();

@@ -17,7 +17,7 @@ import { fetchElevationProfile, type ElevationPoint } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
 import { removeLogicalEdge } from './graph/mutate';
 
-const VIEW_KEY = 'trail-trace-view';
+const VIEW_KEY = 'optimal-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
 const DEFAULT_ZOOM = 11;
 
@@ -342,8 +342,8 @@ function App() {
 
   const handleExportGPX = useCallback(() => {
     if (!cppResult) return;
-    const gpx = generateGPX(cppResult.coords, 'Trail Trace Route');
-    downloadGPX(gpx, 'trail-trace-route.gpx');
+    const gpx = generateGPX(cppResult.coords, 'Optimal Trace Route');
+    downloadGPX(gpx, 'optimal-trace-route.gpx');
   }, [cppResult]);
 
   const trailDist = trails ? trailDistance(trails) : 0;
@@ -352,7 +352,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Trail Trace</h1>
+        <h1>Optimal Trace</h1>
         <span>Chinese Postman Route Planner</span>
       </header>
       <div className="app-main">

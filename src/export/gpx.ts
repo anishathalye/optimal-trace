@@ -7,7 +7,7 @@ export function generateGPX(coords: [number, number][], name: string): string {
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Trail Trace" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Optimal Trace" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
     <name>${escapeXml(name)}</name>
     <trkseg>

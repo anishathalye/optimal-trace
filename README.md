@@ -1,4 +1,4 @@
-# Trail Trace
+# Optimal Trace
 
 Chinese Postman route planner for trails and roads.
 
