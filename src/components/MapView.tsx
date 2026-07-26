@@ -177,12 +177,15 @@ function MapView({
     <MapContainer
       center={center}
       zoom={zoom}
+      maxZoom={21}
       style={{ width: '100%', height: '100%', cursor }}
       zoomControl={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={21}
+        maxNativeZoom={19}
       />
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
