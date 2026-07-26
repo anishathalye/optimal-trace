@@ -82,4 +82,15 @@ describe('solveCPP', () => {
     expect(result.totalDistance).toBeGreaterThanOrEqual(result.uniqueDistance);
     expect(result.coords.length).toBeGreaterThan(0);
   });
+
+  it('regression: blossom matching on four odd-degree nodes does not throw', () => {
+    const g = makeGraph([
+      [[0, 0], [0.001, 0]],
+      [[0.001, 0], [0.002, 0]],
+      [[0, 0.001], [0.001, 0.001]],
+      [[0.001, 0.001], [0.002, 0.001]],
+    ]);
+    const start = firstNode(g);
+    expect(() => solveCPP(g, start)).not.toThrow();
+  });
 });

@@ -1,7 +1,7 @@
 import type { Graph, Edge } from '../graph/types';
 import { oddDegreeNodes, connectedComponents } from '../graph/utils';
 import { dijkstra, reconstructPath } from './dijkstra';
-import blossom from 'edmonds-blossom';
+import blossom from './blossom.js';
 
 interface PathInfo {
   distance: number;
