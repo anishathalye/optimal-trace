@@ -1,32 +1,23 @@
-# React + TypeScript + Vite
+# Trail Trace
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Chinese Postman route planner for trails and roads.
 
-Currently, two official plugins are available:
+## Usage
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+1. Click **Select Area** and draw a rectangle on the map
+2. Click **Fetch Trails**
+3. Optionally erase unwanted segments with the **Erase** tool or by clicking
+4. Click **Set Start Point** and pick a starting location
+5. Click **Compute Route** to generate an optimal trail-covering route
+6. Click **Download GPX** to export
+
+## Tests
+
+```bash
+npm test
+```
