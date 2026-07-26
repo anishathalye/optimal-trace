@@ -4,8 +4,9 @@ import MapView from './components/MapView';
 import type { Bbox } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
-import { trailDistance, trailCount, filterByMinLength } from './utils/geo';
+import { trailDistance, trailCount } from './utils/geo';
 import buildGraph from './graph/build';
+import { graphToFeatures } from './graph/features';
 import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
 import { pointKey } from './graph/types';
@@ -14,6 +15,7 @@ import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
 import { fetchElevationProfile, type ElevationPoint } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
+import { removeLogicalEdge } from './graph/mutate';
 
 const VIEW_KEY = 'trail-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
@@ -74,7 +76,6 @@ function App() {
   const [drawing, setDrawing] = useState(false);
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [includeRoads, setIncludeRoads] = useState(false);
-  const [minLength, setMinLength] = useState(0);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
   const [erasing, setErasing] = useState(false);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -120,14 +121,42 @@ function App() {
     return all;
   }, [removedBatches]);
 
+  const startKey = startLat != null && startLng != null ? pointKey(startLat, startLng) : undefined;
+
+  const logicalGraph = useMemo(() => {
+    if (!graph) return null;
+    return pruneGraph(graph, startKey);
+  }, [graph, startKey]);
+
+  const startNodeId = useMemo(() => {
+    if (!logicalGraph || startKey == null) return null;
+    return logicalGraph.nodes.has(startKey) ? startKey : null;
+  }, [logicalGraph, startKey]);
+
   const trails = useMemo<GeoJSONFeatureCollection | null>(() => {
     if (!rawTrails) return null;
-    let filtered = filterByMinLength(rawTrails.features, minLength);
-    if (removedIds.size > 0) {
-      filtered = filtered.filter((f) => !f.id || !removedIds.has(f.id));
-    }
-    return { type: 'FeatureCollection', features: filtered };
-  }, [rawTrails, minLength, removedIds]);
+    return rawTrails;
+  }, [rawTrails]);
+
+  const displayTrails = useMemo(() => {
+    if (logicalGraph) return graphToFeatures(logicalGraph);
+    return rawTrails;
+  }, [logicalGraph, rawTrails]);
+
+  useEffect(() => {
+    if (!rawTrails) return;
+    setBuildingGraph(true);
+    setTimeout(() => {
+      try {
+        const g = buildGraph(rawTrails.features);
+        setGraph(g);
+        setCppResult(null);
+      } catch (err) {
+        console.error('Graph build failed:', err);
+      }
+      setBuildingGraph(false);
+    }, 0);
+  }, [rawTrails]);
 
   const graphStats = useMemo(() => {
     if (!graph) return null;
@@ -145,18 +174,6 @@ function App() {
       distance: dist,
     };
   }, [graph]);
-
-  const startKey = startLat != null && startLng != null ? pointKey(startLat, startLng) : undefined;
-
-  const logicalGraph = useMemo(() => {
-    if (!graph) return null;
-    return pruneGraph(graph, startKey);
-  }, [graph, startKey]);
-
-  const startNodeId = useMemo(() => {
-    if (!logicalGraph || startKey == null) return null;
-    return logicalGraph.nodes.has(startKey) ? startKey : null;
-  }, [logicalGraph, startKey]);
 
   const [showDebugGraph, setShowDebugGraph] = useState<'raw' | 'logical' | false>(false);
   const debugGraph = useMemo<Graph | null>(() => {
@@ -218,51 +235,50 @@ function App() {
   );
 
   const handleFeatureClick = useCallback((featureId: string) => {
+    if (!graph) return;
+    const newGraph = removeLogicalEdge(graph, featureId);
+    setGraph(newGraph);
     setRemovedBatches((prev) => [...prev, new Set([featureId])]);
-    setGraph(null);
-    setStartLat(null);
-    setStartLng(null);
     setCppResult(null);
-  }, []);
+  }, [graph]);
 
   const handleRestoreRemoved = useCallback(() => {
+    if (!rawTrails) return;
+    setGraph(buildGraph(rawTrails.features));
     setRemovedBatches([]);
-    setGraph(null);
     setStartLat(null);
     setStartLng(null);
-  }, []);
+  }, [rawTrails]);
 
   const handleUndo = useCallback(() => {
-    setRemovedBatches((prev) => prev.slice(0, -1));
-    setGraph(null);
-    setStartLat(null);
-    setStartLng(null);
-  }, []);
-
-  const handleEraseStart = useCallback(() => {
-    setRemovedBatches((prev) => [...prev, new Set<string>()]);
-  }, []);
+    if (!rawTrails) return;
+    setRemovedBatches((prev) => {
+      const next = prev.slice(0, -1);
+      const base = buildGraph(rawTrails.features);
+      const allRemaining = new Set<string>();
+      for (const batch of next) {
+        for (const id of batch) allRemaining.add(id);
+      }
+      let cur = base;
+      for (const id of allRemaining) {
+        cur = removeLogicalEdge(cur, id);
+      }
+      setGraph(cur);
+      return next;
+    });
+  }, [rawTrails]);
 
   const handleEraseFeature = useCallback((featureId: string) => {
     setRemovedBatches((prev) => {
-      if (prev.length === 0) return prev;
       const copy = [...prev];
+      if (copy.length === 0) copy.push(new Set<string>());
       const last = new Set(copy[copy.length - 1]);
       last.add(featureId);
       copy[copy.length - 1] = last;
       return copy;
     });
-    setGraph(null);
-    setStartLat(null);
-    setStartLng(null);
+    setGraph((g) => g ? removeLogicalEdge(g, featureId) : g);
     setCppResult(null);
-  }, []);
-
-  const handleMinLengthChange = useCallback((value: number) => {
-    setMinLength(value);
-    setGraph(null);
-    setStartLat(null);
-    setStartLng(null);
   }, []);
 
   const handleToggleSelectStart = useCallback(() => {
@@ -281,21 +297,7 @@ function App() {
     setStartLat(lat);
     setStartLng(lng);
     setSelectingStart(false);
-
-    if (trails && !graph) {
-      setBuildingGraph(true);
-      setTimeout(() => {
-        try {
-          const g = buildGraph(trails.features);
-          setGraph(g);
-          setCppResult(null);
-        } catch (err) {
-          console.error('Graph build failed:', err);
-        }
-        setBuildingGraph(false);
-      }, 0);
-    }
-  }, [trails, graph]);
+  }, []);
 
   const handleComputeRoute = useCallback(() => {
     if (!logicalGraph || !startNodeId) return;
@@ -343,7 +345,7 @@ function App() {
           <MapView
             drawing={drawing}
             bbox={bbox}
-            trails={trails}
+            trails={displayTrails}
             graph={debugGraph}
             logicalGraph={logicalGraph}
             showDebug={showDebugGraph !== false}
@@ -355,7 +357,6 @@ function App() {
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
             onStartNodeSelected={handleStartNodeSelected}
-            onEraseStart={handleEraseStart}
             onEraseFeature={handleEraseFeature}
             center={center}
             zoom={zoom}
@@ -432,33 +433,6 @@ function App() {
             </div>
           )}
 
-          {rawTrails && (
-            <div className="sidebar-section">
-              <label className="sidebar-slider">
-                <span>Min segment length</span>
-                <div className="slider-row">
-                  <input
-                    type="range"
-                    min={0}
-                    max={300}
-                    step={5}
-                    value={minLength}
-                    onChange={(e) => handleMinLengthChange(Number(e.target.value))}
-                  />
-                  <input
-                    type="number"
-                    className="slider-input"
-                    min={0}
-                    step={5}
-                    value={minLength}
-                    onChange={(e) => handleMinLengthChange(Number(e.target.value))}
-                  />
-                  <span className="slider-unit">ft</span>
-                </div>
-              </label>
-            </div>
-          )}
-
           {trails && (
             <>
               <div className="sidebar-section">
@@ -477,8 +451,9 @@ function App() {
                 </button>
                 <button
                   className={`btn btn-secondary ${erasing ? 'btn-danger' : ''}`}
-                  onClick={() => setErasing((prev) => !prev)}
-                >
+              onClick={() => {
+                setErasing((prev) => !prev);
+              }}>
                   {erasing ? 'Erasing\u2026 click to stop' : 'Erase'}
                 </button>
                 {removedBatches.length > 0 && (

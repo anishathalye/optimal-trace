@@ -105,4 +105,42 @@ describe('pruneGraph', () => {
     expect(pruned.nodes.has(junction)).toBe(true);
     expect(pruned.nodes.size).toBeGreaterThanOrEqual(3);
   });
+
+  it('collapses Y-junction after erasing one branch', () => {
+    const g = makeGraph([
+      [[0, 0], [1, 0]],
+      [[1, 0], [2, 0]],
+      [[1, 0], [1, 1]],
+    ]);
+    const centerKey = pointKey(0, 1);
+    expect(g.nodes.has(centerKey)).toBe(true);
+    expect(g.edges.length).toBe(3);
+
+    const removed = new Set<string>();
+    removed.add(`${pointKey(0, 1)}|${pointKey(1, 1)}`);
+    const toRemove: number[] = [];
+    for (let i = 0; i < g.edges.length; i++) {
+      const e = g.edges[i];
+      const key = e.from < e.to ? `${e.from}|${e.to}` : `${e.to}|${e.from}`;
+      if (removed.has(key)) toRemove.push(i);
+    }
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+      const e = g.edges[toRemove[i]];
+      g.edges.splice(toRemove[i], 1);
+      g.adjacency.get(e.from)?.delete(e.to);
+      g.adjacency.get(e.to)?.delete(e.from);
+      if (g.adjacency.get(e.from)?.size === 0) {
+        g.adjacency.delete(e.from);
+        g.nodes.delete(e.from);
+      }
+      if (g.adjacency.get(e.to)?.size === 0) {
+        g.adjacency.delete(e.to);
+        g.nodes.delete(e.to);
+      }
+    }
+
+    const pruned = pruneGraph(g);
+    expect(pruned.edges.length).toBe(1);
+    expect(pruned.nodes.size).toBe(2);
+  });
 });
