@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, CircleMarker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -98,6 +98,7 @@ interface MapViewProps {
   startNodeId: string | null;
   selectingStart: boolean;
   routeCoords: [number, number][] | null;
+  hoverPoint: { lat: number; lng: number } | null;
   onDrawEnd: (bbox: Bbox) => void;
   onFeatureClick: (featureId: string) => void;
   onStartNodeSelected: (nodeId: string) => void;
@@ -107,7 +108,7 @@ interface MapViewProps {
 
 function MapView({
   drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
-  selectingStart, routeCoords, onDrawEnd, onFeatureClick, onStartNodeSelected,
+  selectingStart, routeCoords, hoverPoint, onDrawEnd, onFeatureClick, onStartNodeSelected,
   center, zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
@@ -143,6 +144,18 @@ function MapView({
             iconSize: [14, 14],
             iconAnchor: [7, 7],
           })}
+        />
+      )}
+      {hoverPoint && (
+        <CircleMarker
+          center={[hoverPoint.lat, hoverPoint.lng]}
+          radius={7}
+          pathOptions={{
+            color: '#fff',
+            fillColor: '#3b82f6',
+            fillOpacity: 1,
+            weight: 3,
+          }}
         />
       )}
       <StartPointPicker active={selectingStart} graph={logicalGraph} onSelect={onStartNodeSelected} />

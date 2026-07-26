@@ -11,6 +11,8 @@ import type { Graph } from './graph/types';
 import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
+import { fetchElevationProfile, type ElevationPoint } from './elevation/api';
+import ElevationProfile from './components/ElevationProfile';
 
 const VIEW_KEY = 'trail-trace-view';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
@@ -79,6 +81,9 @@ function App() {
   const [startNodeId, setStartNodeId] = useState<string | null>(null);
   const [cppResult, setCppResult] = useState<CPPResult | null>(null);
   const [solving, setSolving] = useState(false);
+  const [elevationPoints, setElevationPoints] = useState<ElevationPoint[] | null>(null);
+  const [elevationLoading, setElevationLoading] = useState(false);
+  const [hoverPoint, setHoverPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [center, setCenter] = useState<[number, number]>(() => {
     const cached = loadCachedView();
     return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
@@ -244,6 +249,12 @@ function App() {
       try {
         const result = solveCPP(logicalGraph, startNodeId);
         setCppResult(result);
+
+        setElevationLoading(true);
+        fetchElevationProfile(result.coords)
+          .then(setElevationPoints)
+          .catch((err) => console.error('Elevation fetch failed:', err))
+          .finally(() => setElevationLoading(false));
       } catch (err) {
         console.error('CPP solve failed:', err);
       }
@@ -253,6 +264,8 @@ function App() {
 
   const handleClearRoute = useCallback(() => {
     setCppResult(null);
+    setElevationPoints(null);
+    setHoverPoint(null);
   }, []);
 
   const handleExportGPX = useCallback(() => {
@@ -282,6 +295,7 @@ function App() {
             startNodeId={startNodeId}
             selectingStart={selectingStart}
             routeCoords={cppResult?.coords ?? null}
+            hoverPoint={hoverPoint}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
             onStartNodeSelected={handleStartNodeSelected}
@@ -545,6 +559,15 @@ function App() {
           )}
         </aside>
       </div>
+
+      {elevationPoints && elevationPoints.length > 1 && (
+        <ElevationProfile points={elevationPoints} onHover={setHoverPoint} />
+      )}
+      {elevationLoading && (
+        <div className="elevation-profile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p className="sidebar-loading">Loading elevation&hellip;</p>
+        </div>
+      )}
     </div>
   );
 }
