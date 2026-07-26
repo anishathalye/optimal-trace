@@ -392,13 +392,13 @@ function App() {
         <h1>Optimal Trace</h1>
         <a
           className="commit-hash"
-          href={`https://github.com/anishathalye/optimal-trace/commit/${__COMMIT_HASH__}`}
+          href="https://github.com/anishathalye/optimal-trace"
           target="_blank"
           rel="noopener noreferrer"
         >
           {__COMMIT_HASH__}
         </a>
-        <span>Chinese Postman Route Planner</span>
+
       </header>
       <div className="app-main">
         <div className="map-area">
