@@ -11,20 +11,20 @@ export interface Bbox {
   east: number;
 }
 
+const TRAIL_TAGS = ['path', 'footway', 'track', 'bridleway', 'steps', 'cycleway'] as const;
+const ROAD_TAGS = ['residential', 'unclassified', 'tertiary', 'service', 'living_street', 'pedestrian'] as const;
+
 function buildQuery(bbox: Bbox, includeRoads: boolean): string {
   const { south, west, north, east } = bbox;
   const bboxStr = `(${south},${west},${north},${east})`;
 
-  const trailValues = 'path|footway|track|bridleway|steps|cycleway';
-  const roadValues = 'residential|unclassified|tertiary|service|living_street|pedestrian';
+  const tags = includeRoads ? [...TRAIL_TAGS, ...ROAD_TAGS] : [...TRAIL_TAGS];
 
-  const values = includeRoads ? `${trailValues}|${roadValues}` : trailValues;
+  const wayBlocks = tags
+    .map((tag) => `  way["highway"="${tag}"]${bboxStr};`)
+    .join('\n');
 
-  return (
-    `[out:json][timeout:90];\n` +
-    `way["highway"~"^(${values})$"]["area"!~"^yes$"]${bboxStr};\n` +
-    `out geom;`
-  );
+  return `[out:json][timeout:45];\n(\n${wayBlocks}\n);\nout geom;`;
 }
 
 export async function fetchTrails(
