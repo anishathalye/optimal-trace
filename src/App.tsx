@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import './App.css';
 import MapView from './components/MapView';
-import type { Bbox } from './components/DrawControl';
+import type { Bbox, DrawMode } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
 import { trailDistance, trailCount } from './utils/geo';
@@ -74,7 +74,9 @@ function formatDistance(meters: number): string {
 
 function App() {
   const [drawing, setDrawing] = useState(false);
+  const [drawMode, setDrawMode] = useState<DrawMode>('rectangle');
   const [bbox, setBbox] = useState<Bbox | null>(null);
+  const [polygonCoords, setPolygonCoords] = useState<[number, number][] | null>(null);
   const [includeRoads, setIncludeRoads] = useState(true);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
   const [erasing, setErasing] = useState(false);
@@ -183,8 +185,9 @@ function App() {
     return null;
   }, [graph, logicalGraph, showDebugGraph]);
 
-  const handleDrawEnd = useCallback((newBbox: Bbox) => {
+  const handleDrawEnd = useCallback((newBbox: Bbox, coords?: [number, number][]) => {
     setBbox(newBbox);
+    setPolygonCoords(coords ?? null);
     setDrawing(false);
   }, []);
 
@@ -194,6 +197,7 @@ function App() {
 
   const handleClearBbox = useCallback(() => {
     setBbox(null);
+    setPolygonCoords(null);
     setRemovedBatches([]);
     setGraph(null);
     setStartLat(null);
@@ -355,7 +359,9 @@ function App() {
         <div className="map-area">
           <MapView
             drawing={drawing}
+            drawMode={drawMode}
             bbox={rawTrails ? null : bbox}
+            polygonCoords={rawTrails ? null : polygonCoords}
             trails={displayTrails}
             graph={debugGraph}
             logicalGraph={logicalGraph}
@@ -378,6 +384,18 @@ function App() {
           <h2>Controls</h2>
 
           <div className="sidebar-section">
+            <label className="sidebar-slider">
+              <span>Area shape</span>
+              <select
+                className="slider-input"
+                style={{ width: '100%' }}
+                value={drawMode}
+                onChange={(e) => setDrawMode(e.target.value as DrawMode)}
+              >
+                <option value="rectangle">Rectangle</option>
+                <option value="polygon">Polygon</option>
+              </select>
+            </label>
             <button
               className={`btn ${drawing ? 'btn-active' : ''}`}
               onClick={handleToggleDraw}
@@ -393,7 +411,9 @@ function App() {
 
           {drawing && (
             <p className="sidebar-hint">
-              Click and drag on the map to draw a rectangle.
+              {drawMode === 'polygon'
+                ? 'Click to add vertices. Click near first point or double-click to finish.'
+                : 'Click and drag to draw a rectangle.'}
             </p>
           )}
 

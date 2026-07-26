@@ -6,7 +6,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import LocateButton from './LocateButton';
-import DrawControl, { type Bbox } from './DrawControl';
+import DrawControl, { type Bbox, type DrawMode } from './DrawControl';
 import TrailLayer from './TrailLayer';
 import GraphDebugLayer from './GraphDebugLayer';
 import EraserTool from './EraserTool';
@@ -144,6 +144,7 @@ function StartPointPicker({
 
 interface MapViewProps {
   drawing: boolean;
+  drawMode: DrawMode;
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
   graph: Graph | null;
@@ -154,7 +155,8 @@ interface MapViewProps {
   erasing: boolean;
   routeSegments: RouteSegment[] | null;
   hoverPoint: { lat: number; lng: number } | null;
-  onDrawEnd: (bbox: Bbox) => void;
+  polygonCoords: [number, number][] | null;
+  onDrawEnd: (bbox: Bbox, polygonCoords?: [number, number][]) => void;
   onFeatureClick: (featureId: string) => void;
   onStartNodeSelected: (lat: number, lng: number) => void;
   onEraseFeature: (featureId: string) => void;
@@ -164,7 +166,7 @@ interface MapViewProps {
 }
 
 function MapView({
-  drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
+  drawing, drawMode, bbox, polygonCoords, trails, graph, logicalGraph, showDebug, startNodeId,
   selectingStart, erasing, routeSegments, hoverPoint, onDrawEnd, onFeatureClick,
   onStartNodeSelected, onEraseStart, onEraseFeature,
   center, zoom,
@@ -188,7 +190,7 @@ function MapView({
         maxNativeZoom={19}
       />
       <LocateButton />
-      <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
+      <DrawControl drawing={drawing} drawMode={drawMode} existingBbox={bbox} polygonCoords={polygonCoords} onDrawEnd={onDrawEnd} />
       {trails && (
         <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart || erasing} />
       )}
