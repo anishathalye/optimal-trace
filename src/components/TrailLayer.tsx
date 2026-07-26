@@ -53,7 +53,7 @@ function TrailLayer({ trails, onFeatureClick, disableClicks }: TrailLayerProps) 
 
   return (
     <GeoJSON
-      key={trails.features.length}
+      key={`${trails.features.length}-${disableClicks}`}
       data={trails}
       pathOptions={TRAIL_STYLE}
       onEachFeature={onEachFeature}
