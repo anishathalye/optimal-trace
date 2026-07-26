@@ -236,11 +236,11 @@ function App() {
 
   const handleFeatureClick = useCallback((featureId: string) => {
     if (!graph) return;
-    const newGraph = removeLogicalEdge(graph, featureId);
+    const newGraph = removeLogicalEdge(graph, logicalGraph, featureId);
     setGraph(newGraph);
     setRemovedBatches((prev) => [...prev, new Set([featureId])]);
     setCppResult(null);
-  }, [graph]);
+  }, [graph, logicalGraph]);
 
   const handleRestoreRemoved = useCallback(() => {
     if (!rawTrails) return;
@@ -255,18 +255,25 @@ function App() {
     setRemovedBatches((prev) => {
       const next = prev.slice(0, -1);
       const base = buildGraph(rawTrails.features);
+      const baseLogical = pruneGraph(base);
       const allRemaining = new Set<string>();
       for (const batch of next) {
         for (const id of batch) allRemaining.add(id);
       }
       let cur = base;
+      let curLogical = baseLogical;
       for (const id of allRemaining) {
-        cur = removeLogicalEdge(cur, id);
+        cur = removeLogicalEdge(cur, curLogical, id);
+        curLogical = pruneGraph(cur);
       }
       setGraph(cur);
       return next;
     });
   }, [rawTrails]);
+
+  const handleEraseStart = useCallback(() => {
+    setRemovedBatches((prev) => [...prev, new Set<string>()]);
+  }, []);
 
   const handleEraseFeature = useCallback((featureId: string) => {
     setRemovedBatches((prev) => {
@@ -277,7 +284,11 @@ function App() {
       copy[copy.length - 1] = last;
       return copy;
     });
-    setGraph((g) => g ? removeLogicalEdge(g, featureId) : g);
+    setGraph((g) => {
+      if (!g) return g;
+      const lg = pruneGraph(g);
+      return removeLogicalEdge(g, lg, featureId);
+    });
     setCppResult(null);
   }, []);
 
@@ -357,6 +368,7 @@ function App() {
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
             onStartNodeSelected={handleStartNodeSelected}
+            onEraseStart={handleEraseStart}
             onEraseFeature={handleEraseFeature}
             center={center}
             zoom={zoom}

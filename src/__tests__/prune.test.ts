@@ -63,10 +63,10 @@ describe('pruneGraph', () => {
 
   it('does not empty a cycle', () => {
     const g = makeGraph([
-      [[0, 0], [1, 0]],
-      [[1, 0], [1, 1]],
-      [[1, 1], [0, 1]],
-      [[0, 1], [0, 0]],
+      [[0, 0], [0.001, 0]],
+      [[0.001, 0], [0.001, 0.001]],
+      [[0.001, 0.001], [0, 0.001]],
+      [[0, 0.001], [0, 0]],
     ]);
     const pruned = pruneGraph(g);
     expect(pruned.nodes.size).toBeGreaterThanOrEqual(2);
@@ -94,11 +94,11 @@ describe('pruneGraph', () => {
 
   it('regression: preserves cycle when spoke attached', () => {
     const g = makeGraph([
-      [[0, 0], [1, 0]],
-      [[1, 0], [1, 1]],
-      [[1, 1], [0, 1]],
-      [[0, 1], [0, 0]],
-      [[0, 0], [0.5, -0.5]],
+      [[0, 0], [0.001, 0]],
+      [[0.001, 0], [0.001, 0.001]],
+      [[0.001, 0.001], [0, 0.001]],
+      [[0, 0.001], [0, 0]],
+      [[0, 0], [0.0005, -0.0005]],
     ]);
     const junction = pointKey(0, 0);
     const pruned = pruneGraph(g);

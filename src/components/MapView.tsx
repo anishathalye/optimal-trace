@@ -158,6 +158,7 @@ interface MapViewProps {
   onFeatureClick: (featureId: string) => void;
   onStartNodeSelected: (lat: number, lng: number) => void;
   onEraseFeature: (featureId: string) => void;
+  onEraseStart: () => void;
   center: [number, number];
   zoom: number;
 }
@@ -165,7 +166,7 @@ interface MapViewProps {
 function MapView({
   drawing, bbox, trails, graph, logicalGraph, showDebug, startNodeId,
   selectingStart, erasing, routeSegments, hoverPoint, onDrawEnd, onFeatureClick,
-  onStartNodeSelected, onEraseFeature,
+  onStartNodeSelected, onEraseStart, onEraseFeature,
   center, zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
@@ -192,7 +193,7 @@ function MapView({
         <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart || erasing} />
       )}
       {trails && (
-        <EraserTool active={erasing} trails={trails} onEraseFeature={onEraseFeature} />
+        <EraserTool active={erasing} trails={trails} onEraseStart={onEraseStart} onEraseFeature={onEraseFeature} />
       )}
       {routeSegments && <RouteLayer segments={routeSegments} />}
       {graph && (

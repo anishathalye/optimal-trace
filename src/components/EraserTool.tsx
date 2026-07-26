@@ -21,10 +21,11 @@ function distToSegment(
 interface EraserToolProps {
   active: boolean;
   trails: GeoJSONFeatureCollection | null;
+  onEraseStart: () => void;
   onEraseFeature: (featureId: string) => void;
 }
 
-function EraserTool({ active, trails, onEraseFeature }: EraserToolProps) {
+function EraserTool({ active, trails, onEraseStart, onEraseFeature }: EraserToolProps) {
   const map = useMap();
   const erasing = useRef(false);
   const [mouseLatlng, setMouseLatlng] = useState<L.LatLng | null>(null);
@@ -67,6 +68,7 @@ function EraserTool({ active, trails, onEraseFeature }: EraserToolProps) {
       if (!active) return;
       erasing.current = true;
       map.dragging.disable();
+      onEraseStart();
       eraseAt(e.latlng);
     },
     mousemove(e: L.LeafletMouseEvent) {
