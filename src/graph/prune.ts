@@ -70,7 +70,7 @@ function joinCoords(
   return [...c1, ...c2.slice(1)];
 }
 
-export function pruneGraph(input: Graph): Graph {
+export function pruneGraph(input: Graph, preserveKey?: string): Graph {
   const graph = copyGraph(input);
   let changed = true;
 
@@ -94,6 +94,8 @@ export function pruneGraph(input: Graph): Graph {
       const [n1, n2] = neighbors;
 
       if (n1 === n2) continue;
+
+      if (preserveKey && nodeId === preserveKey) continue;
 
       if (graph.adjacency.get(n1)?.has(n2)) continue;
 

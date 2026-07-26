@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { MapContainer, TileLayer, useMap, Marker, CircleMarker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -61,32 +61,84 @@ function MapViewSync({ center, zoom }: { center: [number, number]; zoom: number 
 
 function StartPointPicker({
   active,
-  graph,
+  trails,
   onSelect,
 }: {
   active: boolean;
-  graph: Graph | null;
-  onSelect: (nodeId: string) => void;
+  trails: GeoJSONFeatureCollection | null;
+  onSelect: (lat: number, lng: number) => void;
 }) {
-  useMapEvents({
-    click(e: L.LeafletMouseEvent) {
-      if (!active || !graph) return;
+  const [preview, setPreview] = useState<{ lat: number; lng: number } | null>(null);
 
-      let bestId = '';
+  useMapEvents({
+    mousemove(e: L.LeafletMouseEvent) {
+      if (!active || !trails) {
+        if (preview) setPreview(null);
+        return;
+      }
+
+      let bestLat = 0;
+      let bestLng = 0;
       let bestDist = Infinity;
-      for (const [id, node] of graph.nodes) {
-        const dLat = node.lat - e.latlng.lat;
-        const dLng = node.lng - e.latlng.lng;
-        const dist = dLat * dLat + dLng * dLng;
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestId = id;
+
+      for (const feature of trails.features) {
+        if (feature.geometry.type !== 'LineString') continue;
+        const coords = feature.geometry.coordinates as [number, number][];
+        for (const [lng, lat] of coords) {
+          const dLat = lat - e.latlng.lat;
+          const dLng = lng - e.latlng.lng;
+          const dist = dLat * dLat + dLng * dLng;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestLat = lat;
+            bestLng = lng;
+          }
         }
       }
-      if (bestId) onSelect(bestId);
+      if (bestDist < Infinity) {
+        setPreview({ lat: bestLat, lng: bestLng });
+      }
+    },
+    click(e: L.LeafletMouseEvent) {
+      if (!active || !trails) return;
+
+      let bestLat = 0;
+      let bestLng = 0;
+      let bestDist = Infinity;
+
+      for (const feature of trails.features) {
+        if (feature.geometry.type !== 'LineString') continue;
+        const coords = feature.geometry.coordinates as [number, number][];
+        for (const [lng, lat] of coords) {
+          const dLat = lat - e.latlng.lat;
+          const dLng = lng - e.latlng.lng;
+          const dist = dLat * dLat + dLng * dLng;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestLat = lat;
+            bestLng = lng;
+          }
+        }
+      }
+      if (bestDist < Infinity) onSelect(bestLat, bestLng);
     },
   });
-  return null;
+
+  useEffect(() => {
+    if (!active) setPreview(null);
+  }, [active]);
+
+  return preview ? (
+    <Marker
+      position={[preview.lat, preview.lng]}
+      icon={L.divIcon({
+        className: '',
+        html: '<div style="background:rgba(34,197,94,0.45);width:14px;height:14px;border-radius:50%;border:3px solid rgba(255,255,255,0.6);box-shadow:0 0 6px rgba(0,0,0,0.3)"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      })}
+    />
+  ) : null;
 }
 
 interface MapViewProps {
@@ -102,7 +154,7 @@ interface MapViewProps {
   hoverPoint: { lat: number; lng: number } | null;
   onDrawEnd: (bbox: Bbox) => void;
   onFeatureClick: (featureId: string) => void;
-  onStartNodeSelected: (nodeId: string) => void;
+  onStartNodeSelected: (lat: number, lng: number) => void;
   center: [number, number];
   zoom: number;
 }
@@ -130,13 +182,13 @@ function MapView({
       <LocateButton />
       <DrawControl drawing={drawing} existingBbox={bbox} onDrawEnd={onDrawEnd} />
       {trails && (
-        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} />
+        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart} />
       )}
       {routeSegments && <RouteLayer segments={routeSegments} />}
       {graph && (
         <GraphDebugLayer graph={graph} showNodes={showDebug} showEdges={showDebug} />
       )}
-      {startNode && (
+      {startNode && !selectingStart && (
         <Marker
           position={[startNode.lat, startNode.lng]}
           icon={L.divIcon({
@@ -159,7 +211,7 @@ function MapView({
           }}
         />
       )}
-      <StartPointPicker active={selectingStart} graph={logicalGraph} onSelect={onStartNodeSelected} />
+      <StartPointPicker active={selectingStart} trails={trails} onSelect={onStartNodeSelected} />
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>

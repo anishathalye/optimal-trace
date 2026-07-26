@@ -18,9 +18,10 @@ const HOVER_STYLE: L.PathOptions = {
 interface TrailLayerProps {
   trails: GeoJSONFeatureCollection;
   onFeatureClick: (featureId: string) => void;
+  disableClicks?: boolean;
 }
 
-function TrailLayer({ trails, onFeatureClick }: TrailLayerProps) {
+function TrailLayer({ trails, onFeatureClick, disableClicks }: TrailLayerProps) {
   const map = useMap();
 
   const onEachFeature = useCallback(
@@ -28,23 +29,26 @@ function TrailLayer({ trails, onFeatureClick }: TrailLayerProps) {
       const pathLayer = layer as L.Path;
 
       const handleClick = () => {
+        if (disableClicks) return;
         if (feature.id) onFeatureClick(feature.id);
       };
 
       pathLayer.on({
         click: handleClick,
         mouseover: () => {
+          if (disableClicks) return;
           map.getContainer().style.cursor = 'pointer';
           pathLayer.setStyle(HOVER_STYLE);
           pathLayer.bringToFront();
         },
         mouseout: () => {
+          if (disableClicks) return;
           map.getContainer().style.cursor = '';
           pathLayer.setStyle(TRAIL_STYLE);
         },
       });
     },
-    [map, onFeatureClick]
+    [map, onFeatureClick, disableClicks]
   );
 
   return (

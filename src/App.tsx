@@ -8,6 +8,7 @@ import { trailDistance, trailCount, filterByMinLength } from './utils/geo';
 import buildGraph from './graph/build';
 import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
+import { pointKey } from './graph/types';
 import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
@@ -78,7 +79,8 @@ function App() {
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
   const [selectingStart, setSelectingStart] = useState(false);
-  const [startNodeId, setStartNodeId] = useState<string | null>(null);
+  const [startLat, setStartLat] = useState<number | null>(null);
+  const [startLng, setStartLng] = useState<number | null>(null);
   const [cppResult, setCppResult] = useState<CPPResult | null>(null);
   const [solving, setSolving] = useState(false);
   const [elevationPoints, setElevationPoints] = useState<ElevationPoint[] | null>(null);
@@ -135,10 +137,17 @@ function App() {
     };
   }, [graph]);
 
+  const startKey = startLat != null && startLng != null ? pointKey(startLat, startLng) : undefined;
+
   const logicalGraph = useMemo(() => {
     if (!graph) return null;
-    return pruneGraph(graph);
-  }, [graph]);
+    return pruneGraph(graph, startKey);
+  }, [graph, startKey]);
+
+  const startNodeId = useMemo(() => {
+    if (!logicalGraph || startKey == null) return null;
+    return logicalGraph.nodes.has(startKey) ? startKey : null;
+  }, [logicalGraph, startKey]);
 
   const [showDebugGraph, setShowDebugGraph] = useState<'raw' | 'logical' | false>(false);
   const debugGraph = useMemo<Graph | null>(() => {
@@ -161,7 +170,8 @@ function App() {
     setBbox(null);
     setRemovedIds(new Set());
     setGraph(null);
-    setStartNodeId(null);
+    setStartLat(null);
+    setStartLng(null);
     setCppResult(null);
     clearTrails();
   }, [clearTrails]);
@@ -170,7 +180,8 @@ function App() {
     if (bbox) {
       setRemovedIds(new Set());
       setGraph(null);
-      setStartNodeId(null);
+      setStartLat(null);
+      setStartLng(null);
       fetchTrails(bbox, includeRoads);
     }
   }, [bbox, includeRoads, fetchTrails]);
@@ -178,7 +189,8 @@ function App() {
   const handleClearTrails = useCallback(() => {
     setRemovedIds(new Set());
     setGraph(null);
-    setStartNodeId(null);
+    setStartLat(null);
+    setStartLng(null);
     clearTrails();
   }, [clearTrails]);
 
@@ -188,7 +200,8 @@ function App() {
       if (bbox && rawTrails) {
         setRemovedIds(new Set());
         setGraph(null);
-        setStartNodeId(null);
+        setStartLat(null);
+        setStartLng(null);
         fetchTrails(bbox, checked);
       }
     },
@@ -202,45 +215,56 @@ function App() {
       return next;
     });
     setGraph(null);
-    setStartNodeId(null);
+    setStartLat(null);
+    setStartLng(null);
     setCppResult(null);
   }, []);
 
   const handleRestoreRemoved = useCallback(() => {
     setRemovedIds(new Set());
     setGraph(null);
-    setStartNodeId(null);
+    setStartLat(null);
+    setStartLng(null);
   }, []);
 
   const handleMinLengthChange = useCallback((value: number) => {
     setMinLength(value);
     setGraph(null);
-    setStartNodeId(null);
+    setStartLat(null);
+    setStartLng(null);
   }, []);
-
-  const handleBuildGraph = useCallback(() => {
-    if (!trails) return;
-    setBuildingGraph(true);
-    setTimeout(() => {
-      try {
-        const g = buildGraph(trails.features);
-        setGraph(g);
-        setStartNodeId(null);
-      } catch (err) {
-        console.error('Graph build failed:', err);
-      }
-      setBuildingGraph(false);
-    }, 0);
-  }, [trails]);
 
   const handleToggleSelectStart = useCallback(() => {
-    setSelectingStart((prev) => !prev);
+    setSelectingStart((prev) => {
+      if (!prev) {
+        setStartLat(null);
+        setStartLng(null);
+        setCppResult(null);
+        return true;
+      }
+      return false;
+    });
   }, []);
 
-  const handleStartNodeSelected = useCallback((nodeId: string) => {
-    setStartNodeId(nodeId);
+  const handleStartNodeSelected = useCallback((lat: number, lng: number) => {
+    setStartLat(lat);
+    setStartLng(lng);
     setSelectingStart(false);
-  }, []);
+
+    if (trails && !graph) {
+      setBuildingGraph(true);
+      setTimeout(() => {
+        try {
+          const g = buildGraph(trails.features);
+          setGraph(g);
+          setCppResult(null);
+        } catch (err) {
+          console.error('Graph build failed:', err);
+        }
+        setBuildingGraph(false);
+      }, 0);
+    }
+  }, [trails, graph]);
 
   const handleComputeRoute = useCallback(() => {
     if (!logicalGraph || !startNodeId) return;
@@ -430,10 +454,23 @@ function App() {
             </p>
           )}
 
-          {trails && !graph && !buildingGraph && (
-            <button className="btn btn-primary" onClick={handleBuildGraph}>
-              Build Graph
-            </button>
+          {trails && (
+            <div className="sidebar-section">
+              <button
+                className={`btn ${selectingStart ? 'btn-active' : ''}`}
+                onClick={handleToggleSelectStart}
+              >
+                {selectingStart ? 'Click map to set start\u2026' : 'Set Start Point'}
+              </button>
+              {startLat != null && (
+                <p className="sidebar-note">
+                  Start point set.
+                  {' '}
+                  ({startLat.toFixed(5)},{' '}
+                  {startLng?.toFixed(5)})
+                </p>
+              )}
+            </div>
           )}
 
           {buildingGraph && (
@@ -483,23 +520,6 @@ function App() {
                     </select>
                   </div>
                 </label>
-              </div>
-
-              <div className="sidebar-section">
-                <button
-                  className={`btn ${selectingStart ? 'btn-active' : ''}`}
-                  onClick={handleToggleSelectStart}
-                >
-                  {selectingStart ? 'Click map to set start\u2026' : 'Set Start Point'}
-                </button>
-                {startNodeId && logicalGraph && logicalGraph.nodes.has(startNodeId) && (
-                  <p className="sidebar-note">
-                    Start point set.
-                    {' '}
-                    ({logicalGraph.nodes.get(startNodeId)!.lat.toFixed(5)},{' '}
-                    {logicalGraph.nodes.get(startNodeId)!.lng.toFixed(5)})
-                  </p>
-                )}
               </div>
 
               {startNodeId && !cppResult && !solving && (
