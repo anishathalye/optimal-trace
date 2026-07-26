@@ -1,5 +1,8 @@
 import type { Graph } from './types';
-import type { GeoJSONFeatureCollection, GeoJSONFeature } from '../hooks/useOverpass';
+import type {
+  GeoJSONFeatureCollection,
+  GeoJSONFeature,
+} from '../hooks/useOverpass';
 
 export function graphToFeatures(graph: Graph): GeoJSONFeatureCollection {
   const features: GeoJSONFeature[] = graph.edges.map((edge) => {

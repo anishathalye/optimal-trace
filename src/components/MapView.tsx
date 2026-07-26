@@ -1,5 +1,12 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, CircleMarker, useMapEvents } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  useMap,
+  Marker,
+  CircleMarker,
+  useMapEvents,
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -15,7 +22,8 @@ import type { RouteSegment } from '../solver/cpp';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
 import type { Graph } from '../graph/types';
 
-delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)
+  ._getIconUrl;
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -27,14 +35,19 @@ const VIEW_KEY = 'optimal-trace-view';
 
 function MapPersistence() {
   const map = useMap();
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const saveView = useCallback(() => {
     const c = map.getCenter();
     const z = map.getZoom();
     try {
-      localStorage.setItem(VIEW_KEY, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: z }));
-    } catch { /* storage full */ }
+      localStorage.setItem(
+        VIEW_KEY,
+        JSON.stringify({ lat: c.lat, lng: c.lng, zoom: z }),
+      );
+    } catch {
+      /* storage full */
+    }
   }, [map]);
 
   useEffect(() => {
@@ -52,7 +65,13 @@ function MapPersistence() {
   return null;
 }
 
-function MapViewSync({ center, zoom }: { center: [number, number]; zoom: number }) {
+function MapViewSync({
+  center,
+  zoom,
+}: {
+  center: [number, number];
+  zoom: number;
+}) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, zoom);
@@ -69,7 +88,9 @@ function StartPointPicker({
   trails: GeoJSONFeatureCollection | null;
   onSelect: (lat: number, lng: number) => void;
 }) {
-  const [preview, setPreview] = useState<{ lat: number; lng: number } | null>(null);
+  const [preview, setPreview] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
 
   useMapEvents({
     mousemove(e: L.LeafletMouseEvent) {
@@ -166,14 +187,31 @@ interface MapViewProps {
 }
 
 function MapView({
-  drawing, drawMode, bbox, polygonCoords, trails, graph, logicalGraph, showDebug, startNodeId,
-  selectingStart, erasing, routeSegments, hoverPoint, onDrawEnd, onFeatureClick,
-  onStartNodeSelected, onEraseStart, onEraseFeature,
-  center, zoom,
+  drawing,
+  drawMode,
+  bbox,
+  polygonCoords,
+  trails,
+  graph,
+  logicalGraph,
+  showDebug,
+  startNodeId,
+  selectingStart,
+  erasing,
+  routeSegments,
+  hoverPoint,
+  onDrawEnd,
+  onFeatureClick,
+  onStartNodeSelected,
+  onEraseStart,
+  onEraseFeature,
+  center,
+  zoom,
 }: MapViewProps) {
   const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
 
-  const startNode = startNodeId && logicalGraph ? logicalGraph.nodes.get(startNodeId) : null;
+  const startNode =
+    startNodeId && logicalGraph ? logicalGraph.nodes.get(startNodeId) : null;
 
   return (
     <MapContainer
@@ -190,16 +228,35 @@ function MapView({
         maxNativeZoom={19}
       />
       <LocateButton />
-      <DrawControl drawing={drawing} drawMode={drawMode} existingBbox={bbox} polygonCoords={polygonCoords} onDrawEnd={onDrawEnd} />
+      <DrawControl
+        drawing={drawing}
+        drawMode={drawMode}
+        existingBbox={bbox}
+        polygonCoords={polygonCoords}
+        onDrawEnd={onDrawEnd}
+      />
       {trails && (
-        <TrailLayer trails={trails} onFeatureClick={onFeatureClick} disableClicks={selectingStart || erasing} />
+        <TrailLayer
+          trails={trails}
+          onFeatureClick={onFeatureClick}
+          disableClicks={selectingStart || erasing}
+        />
       )}
       {trails && (
-        <EraserTool active={erasing} trails={trails} onEraseStart={onEraseStart} onEraseFeature={onEraseFeature} />
+        <EraserTool
+          active={erasing}
+          trails={trails}
+          onEraseStart={onEraseStart}
+          onEraseFeature={onEraseFeature}
+        />
       )}
       {routeSegments && <RouteLayer segments={routeSegments} />}
       {graph && (
-        <GraphDebugLayer graph={graph} showNodes={showDebug} showEdges={showDebug} />
+        <GraphDebugLayer
+          graph={graph}
+          showNodes={showDebug}
+          showEdges={showDebug}
+        />
       )}
       {startNode && !selectingStart && (
         <Marker
@@ -224,7 +281,11 @@ function MapView({
           }}
         />
       )}
-      <StartPointPicker active={selectingStart} trails={trails} onSelect={onStartNodeSelected} />
+      <StartPointPicker
+        active={selectingStart}
+        trails={trails}
+        onSelect={onStartNodeSelected}
+      />
       <MapPersistence />
       <MapViewSync center={center} zoom={zoom} />
     </MapContainer>

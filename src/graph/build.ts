@@ -1,10 +1,6 @@
 import type { GeoJSONFeature } from '../hooks/useOverpass';
 import { pointKey, type Node, type Edge, type Graph } from './types';
-import {
-  findAllIntersections,
-  type RawSegment,
-  type Point,
-} from './intersect';
+import { findAllIntersections, type RawSegment, type Point } from './intersect';
 import { haversineDistance } from '../utils/geo';
 
 function flattenSegments(features: GeoJSONFeature[]): {
@@ -42,11 +38,27 @@ function buildGraph(features: GeoJSONFeature[]): Graph {
   const segKey = (fi: number, si: number) => fi * 1_000_000 + si;
 
   for (const [, inter] of intersectionMap) {
-    const keyA = segKey(segments[inter.segA].featureIdx, segments[inter.segA].segmentIdx);
-    const keyB = segKey(segments[inter.segB].featureIdx, segments[inter.segB].segmentIdx);
+    const keyA = segKey(
+      segments[inter.segA].featureIdx,
+      segments[inter.segA].segmentIdx,
+    );
+    const keyB = segKey(
+      segments[inter.segB].featureIdx,
+      segments[inter.segB].segmentIdx,
+    );
 
-    const distA = haversineDistance(segments[inter.segA].a[1], segments[inter.segA].a[0], inter.point[1], inter.point[0]);
-    const distB = haversineDistance(segments[inter.segB].a[1], segments[inter.segB].a[0], inter.point[1], inter.point[0]);
+    const distA = haversineDistance(
+      segments[inter.segA].a[1],
+      segments[inter.segA].a[0],
+      inter.point[1],
+      inter.point[0],
+    );
+    const distB = haversineDistance(
+      segments[inter.segB].a[1],
+      segments[inter.segB].a[0],
+      inter.point[1],
+      inter.point[0],
+    );
 
     if (!segIntersections.has(keyA)) segIntersections.set(keyA, []);
     segIntersections.get(keyA)!.push({ point: inter.point, dist: distA });
@@ -65,11 +77,20 @@ function buildGraph(features: GeoJSONFeature[]): Graph {
     }
   }
 
-  function addEdge(fromKey: string, toKey: string, edgeCoords: [number, number][]) {
+  function addEdge(
+    fromKey: string,
+    toKey: string,
+    edgeCoords: [number, number][],
+  ) {
     if (fromKey === toKey) return;
     let dist = 0;
     for (let i = 1; i < edgeCoords.length; i++) {
-      dist += haversineDistance(edgeCoords[i - 1][1], edgeCoords[i - 1][0], edgeCoords[i][1], edgeCoords[i][0]);
+      dist += haversineDistance(
+        edgeCoords[i - 1][1],
+        edgeCoords[i - 1][0],
+        edgeCoords[i][1],
+        edgeCoords[i][0],
+      );
     }
     if (dist < 0.1) return;
 

@@ -34,6 +34,7 @@ A frontend-only web app for computing the Chinese Postman Problem (CPP) route ov
 **Objective:** Let the user pan/zoom the map and draw a rectangular bounding box to define the area of interest.
 
 **Key tasks:**
+
 1. Add `FeatureGroup` + `EditControl` from `leaflet-draw` (imperatively via `useMap()` hook)
 2. Restrict draw controls to **rectangle only** (hide polygon, circle, marker, polyline)
 3. On rectangle created, store the bounding box coords in state (`[south, west, north, east]`)
@@ -50,6 +51,7 @@ A frontend-only web app for computing the Chinese Postman Problem (CPP) route ov
 **Objective:** Query the Overpass API for all trails within the selected rectangle and render them on the map.
 
 **Key tasks:**
+
 1. Add a "Fetch Trails" button in the sidebar (enabled only when a bbox is selected)
 2. Build the Overpass query — filter for `highway=path|footway|track|bridleway|steps` plus cycleways, with optional `sac_scale`/`trail_visibility` awareness
 3. POST to `https://overpass-api.de/api/interpreter` with the query
@@ -60,6 +62,7 @@ A frontend-only web app for computing the Chinese Postman Problem (CPP) route ov
 8. Optional: add a fallback Overpass endpoint (`https://overpass.private.coffee/api/interpreter`)
 
 **Detailed Overpass query:**
+
 ```
 [out:json][timeout:30];
 (
@@ -83,6 +86,7 @@ out geom;
 **Objective:** Convert the fetched GeoJSON trail lines into a clean graph suitable for CPP computation, and let the user pick a starting point.
 
 **Key tasks:**
+
 1. Build an undirected weighted graph from trail GeoJSON:
    - Nodes = unique coordinates (rounded to ~6 decimal places to merge near-duplicates)
    - Edges = trail segments between nodes, weighted by haversine distance (meters)
@@ -103,6 +107,7 @@ out geom;
 **Objective:** Implement the CPP algorithm in TypeScript, entirely in the browser.
 
 **Algorithm (undirected CPP, same start/end):**
+
 1. **Find odd-degree vertices.** Sum the degrees. If zero odd vertices, graph is already Eulerian.
 2. **All-pairs shortest paths.** Compute shortest-path distances between every pair of odd-degree vertices using Dijkstra (from `graph-data-structure` or hand-rolled).
 3. **Minimum-weight perfect matching.** Use `edmonds-blossom` to pair odd vertices, minimizing total path distance.
@@ -110,6 +115,7 @@ out geom;
 5. **Generate Euler circuit.** Run Hierholzer's algorithm on the augmented (Eulerian) graph, starting from the user's chosen start node.
 
 **Key implementation files:**
+
 - `src/solver/graph.ts` — graph data structure (adjacency list, add edge, duplicate edge, degree queries)
 - `src/solver/dijkstra.ts` — single-source shortest paths
 - `src/solver/all-pairs.ts` — all-pairs shortest paths for odd vertices
@@ -118,6 +124,7 @@ out geom;
 - `src/solver/cpp.ts` — orchestrator: takes graph + start node, returns ordered list of node IDs
 
 **Edge cases to handle:**
+
 - Disconnected graph: only solve the connected component containing the start node (warn user about unreachable trails)
 - Graph with zero edges or one edge
 - Very large graphs: show a progress indicator for matching/dijkstra phases
@@ -131,6 +138,7 @@ out geom;
 **Objective:** Render the computed route on the map and allow the user to export it as a GPX file.
 
 **Key tasks:**
+
 1. Render the CPP route as a distinct, brightly-colored polyline on the map (over the trail lines)
 2. Differentiate between "first traversal" (trail segments) and "retraced" edges (duplicated paths) with different colors or dashes
 3. Show route statistics in the sidebar:
@@ -216,13 +224,13 @@ src/
 
 ## Key Design Decisions
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Map library | Leaflet (react-leaflet v5) | Free tiles, mature drawing plugin, simple API |
-| Rectangle drawing | leaflet-draw (imperative) | `react-leaflet-draw` is unmaintained; imperative via `useMap()` is reliable |
-| Overpass CORS | Direct `fetch()` from browser | Overpass API sends CORS headers natively — no proxy needed |
-| Graph structure | Custom adjacency list (`Map<string, Map<string, number>>`) | Minimal overhead, full control, easy to serialize |
-| Matching algorithm | `edmonds-blossom` (v1.0.0) | Stable algorithm, zero deps, only npm Blossom implementation available |
-| GPX export | Hand-rolled XML template | GPX 1.1 is trivial (~30 lines), no dependency needed |
-| Spatial queries | `geokdbush` | Fastest JS KNN for geo points, same author as Leaflet |
-| State management | React `useState`/`useReducer` | App state is simple enough; no need for Redux/Zustand |
+| Decision           | Choice                                                     | Rationale                                                                   |
+| ------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Map library        | Leaflet (react-leaflet v5)                                 | Free tiles, mature drawing plugin, simple API                               |
+| Rectangle drawing  | leaflet-draw (imperative)                                  | `react-leaflet-draw` is unmaintained; imperative via `useMap()` is reliable |
+| Overpass CORS      | Direct `fetch()` from browser                              | Overpass API sends CORS headers natively — no proxy needed                  |
+| Graph structure    | Custom adjacency list (`Map<string, Map<string, number>>`) | Minimal overhead, full control, easy to serialize                           |
+| Matching algorithm | `edmonds-blossom` (v1.0.0)                                 | Stable algorithm, zero deps, only npm Blossom implementation available      |
+| GPX export         | Hand-rolled XML template                                   | GPX 1.1 is trivial (~30 lines), no dependency needed                        |
+| Spatial queries    | `geokdbush`                                                | Fastest JS KNN for geo points, same author as Leaflet                       |
+| State management   | React `useState`/`useReducer`                              | App state is simple enough; no need for Redux/Zustand                       |

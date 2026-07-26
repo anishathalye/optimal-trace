@@ -41,7 +41,9 @@ function LocateButton() {
         setLocating(false);
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            alert('Location access denied. Please enable location permissions in your browser settings.');
+            alert(
+              'Location access denied. Please enable location permissions in your browser settings.',
+            );
             break;
           case error.POSITION_UNAVAILABLE:
             alert('Location information is unavailable.');
@@ -53,7 +55,7 @@ function LocateButton() {
             alert('An unknown error occurred while getting your location.');
         }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   }, [map, marker]);
 

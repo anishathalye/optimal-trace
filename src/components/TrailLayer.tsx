@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import type { GeoJSONFeatureCollection, GeoJSONFeature } from '../hooks/useOverpass';
+import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
 
 const TRAIL_STYLE: L.PathOptions = {
   color: '#e05a2a',
@@ -21,16 +21,20 @@ interface TrailLayerProps {
   disableClicks?: boolean;
 }
 
-function TrailLayer({ trails, onFeatureClick, disableClicks }: TrailLayerProps) {
+function TrailLayer({
+  trails,
+  onFeatureClick,
+  disableClicks,
+}: TrailLayerProps) {
   const map = useMap();
 
   const onEachFeature = useCallback(
-    (feature: GeoJSONFeature, layer: L.Layer) => {
+    (feature: { id?: string | number }, layer: L.Layer) => {
       const pathLayer = layer as L.Path;
 
       const handleClick = () => {
         if (disableClicks) return;
-        if (feature.id) onFeatureClick(feature.id);
+        if (feature.id) onFeatureClick(feature.id as string);
       };
 
       pathLayer.on({
@@ -48,7 +52,7 @@ function TrailLayer({ trails, onFeatureClick, disableClicks }: TrailLayerProps) 
         },
       });
     },
-    [map, onFeatureClick, disableClicks]
+    [map, onFeatureClick, disableClicks],
   );
 
   return (

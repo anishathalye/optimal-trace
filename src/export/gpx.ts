@@ -2,7 +2,7 @@ export function generateGPX(coords: [number, number][], name: string): string {
   const trackPoints = coords
     .map(
       ([lng, lat]) =>
-        `      <trkpt lat="${lat.toFixed(7)}" lon="${lng.toFixed(7)}"></trkpt>`
+        `      <trkpt lat="${lat.toFixed(7)}" lon="${lng.toFixed(7)}"></trkpt>`,
     )
     .join('\n');
 

@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Rectangle, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
+import {
+  Rectangle,
+  Polygon,
+  Polyline,
+  CircleMarker,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import L from 'leaflet';
 
 export interface Bbox {
@@ -19,7 +26,13 @@ interface DrawControlProps {
   onDrawEnd: (bbox: Bbox, polygonCoords?: [number, number][]) => void;
 }
 
-function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd }: DrawControlProps) {
+function DrawControl({
+  drawing,
+  drawMode,
+  existingBbox,
+  polygonCoords,
+  onDrawEnd,
+}: DrawControlProps) {
   const map = useMap();
   const [draftBounds, setDraftBounds] = useState<L.LatLngBounds | null>(null);
   const [polyVertices, setPolyVertices] = useState<L.LatLng[]>([]);
@@ -53,11 +66,11 @@ function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd
           north: bounds.getNorth(),
           east: bounds.getEast(),
         },
-        coords
+        coords,
       );
       setPolyVertices([]);
     },
-    [onDrawEnd]
+    [onDrawEnd],
   );
 
   useMapEvents({
@@ -118,7 +131,10 @@ function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd
   });
 
   const existingBounds = existingBbox
-    ? L.latLngBounds([existingBbox.south, existingBbox.west], [existingBbox.north, existingBbox.east])
+    ? L.latLngBounds(
+        [existingBbox.south, existingBbox.west],
+        [existingBbox.north, existingBbox.east],
+      )
     : null;
 
   const previewPoly =
@@ -140,7 +156,9 @@ function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd
       )}
       {polygonCoords && (
         <Polygon
-          positions={polygonCoords.map(([lng, lat]) => [lat, lng] as [number, number])}
+          positions={polygonCoords.map(
+            ([lng, lat]) => [lat, lng] as [number, number],
+          )}
           pathOptions={{
             color: '#4a6fa5',
             weight: 2,
@@ -161,7 +179,9 @@ function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd
       )}
       {polyVertices.length > 0 && (
         <Polygon
-          positions={previewPoly.map((ll) => [ll.lat, ll.lng] as [number, number])}
+          positions={previewPoly.map(
+            (ll) => [ll.lat, ll.lng] as [number, number],
+          )}
           pathOptions={{
             color: '#4a6fa5',
             weight: 2,
@@ -185,20 +205,26 @@ function DrawControl({ drawing, drawMode, existingBbox, polygonCoords, onDrawEnd
             }}
           />
         ))}
-      {drawMode === 'polygon' && drawing && mouseLatlng && polyVertices.length > 0 && (
-        <Polyline
-          positions={[
-            [polyVertices[polyVertices.length - 1].lat, polyVertices[polyVertices.length - 1].lng],
-            [mouseLatlng.lat, mouseLatlng.lng],
-          ]}
-          pathOptions={{
-            color: '#4a6fa5',
-            weight: 1.5,
-            dashArray: '4 3',
-            opacity: 0.6,
-          }}
-        />
-      )}
+      {drawMode === 'polygon' &&
+        drawing &&
+        mouseLatlng &&
+        polyVertices.length > 0 && (
+          <Polyline
+            positions={[
+              [
+                polyVertices[polyVertices.length - 1].lat,
+                polyVertices[polyVertices.length - 1].lng,
+              ],
+              [mouseLatlng.lat, mouseLatlng.lng],
+            ]}
+            pathOptions={{
+              color: '#4a6fa5',
+              weight: 1.5,
+              dashArray: '4 3',
+              opacity: 0.6,
+            }}
+          />
+        )}
     </>
   );
 }

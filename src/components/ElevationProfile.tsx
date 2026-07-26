@@ -112,7 +112,11 @@ function ElevationProfile({ points, onHover }: ElevationProfileProps) {
     for (let i = 0; i <= yTicks; i++) {
       const elev = minElev + (elevRange * i) / yTicks;
       const ey = pad.top + ch - (ch * i) / yTicks + 4;
-      ctx.fillText(`${Math.round(elev * 3.28084).toLocaleString()} ft`, pad.left - 4, ey);
+      ctx.fillText(
+        `${Math.round(elev * 3.28084).toLocaleString()} ft`,
+        pad.left - 4,
+        ey,
+      );
     }
 
     ctx.textAlign = 'center';
@@ -120,7 +124,13 @@ function ElevationProfile({ points, onHover }: ElevationProfileProps) {
       const d = (maxDist * i) / distTicks;
       const dx = pad.left + (cw * i) / distTicks;
       const ft = d * 3.28084;
-      ctx.fillText(ft >= 5280 ? `${(ft / 5280).toFixed(1)} mi` : `${Math.round(ft).toLocaleString()} ft`, dx, h - 2);
+      ctx.fillText(
+        ft >= 5280
+          ? `${(ft / 5280).toFixed(1)} mi`
+          : `${Math.round(ft).toLocaleString()} ft`,
+        dx,
+        h - 2,
+      );
     }
   }, [points, cursorIdx]);
 
@@ -155,14 +165,17 @@ function ElevationProfile({ points, onHover }: ElevationProfileProps) {
           hi = mid;
         }
       }
-      if (lo > 0 && targetDist - points[lo - 1].dist < points[lo].dist - targetDist) {
+      if (
+        lo > 0 &&
+        targetDist - points[lo - 1].dist < points[lo].dist - targetDist
+      ) {
         lo = lo - 1;
       }
 
       setCursorIdx(lo);
       onHover(points[lo]);
     },
-    [points, onHover]
+    [points, onHover],
   );
 
   const handleMouseLeave = useCallback(() => {

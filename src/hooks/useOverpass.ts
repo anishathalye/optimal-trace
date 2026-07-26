@@ -4,7 +4,7 @@ import osmtogeojson from 'osmtogeojson';
 
 export interface GeoJSONFeature {
   type: 'Feature';
-  id?: string;
+  id?: string | number;
   geometry: {
     type: string;
     coordinates: unknown;

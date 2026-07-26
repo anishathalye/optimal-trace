@@ -10,7 +10,11 @@ import { graphToFeatures } from './graph/features';
 import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
 import { pointKey } from './graph/types';
-import { connectedComponents, oddDegreeNodes, totalEdgeDistance } from './graph/utils';
+import {
+  connectedComponents,
+  oddDegreeNodes,
+  totalEdgeDistance,
+} from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
 import { fetchElevationProfile, type ElevationPoint } from './elevation/api';
@@ -32,11 +36,17 @@ function loadCachedView(): CachedView | null {
     const raw = localStorage.getItem(VIEW_KEY);
     if (raw) {
       const v = JSON.parse(raw);
-      if (typeof v.lat === 'number' && typeof v.lng === 'number' && typeof v.zoom === 'number') {
+      if (
+        typeof v.lat === 'number' &&
+        typeof v.lng === 'number' &&
+        typeof v.zoom === 'number'
+      ) {
         return v;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
@@ -47,7 +57,8 @@ function formatCoord(value: number): string {
 function bboxArea(bbox: Bbox): number {
   const latMid = (bbox.north + bbox.south) / 2;
   const latLen = (bbox.north - bbox.south) * 111320;
-  const lonLen = (bbox.east - bbox.west) * 111320 * Math.cos((latMid * Math.PI) / 180);
+  const lonLen =
+    (bbox.east - bbox.west) * 111320 * Math.cos((latMid * Math.PI) / 180);
   return Math.abs(latLen * lonLen);
 }
 
@@ -76,7 +87,9 @@ function App() {
   const [drawing, setDrawing] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode>('rectangle');
   const [bbox, setBbox] = useState<Bbox | null>(null);
-  const [polygonCoords, setPolygonCoords] = useState<[number, number][] | null>(null);
+  const [polygonCoords, setPolygonCoords] = useState<[number, number][] | null>(
+    null,
+  );
   const [includeRoads, setIncludeRoads] = useState(true);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
   const [erasing, setErasing] = useState(false);
@@ -87,9 +100,14 @@ function App() {
   const [startLng, setStartLng] = useState<number | null>(null);
   const [cppResult, setCppResult] = useState<CPPResult | null>(null);
   const [solving, setSolving] = useState(false);
-  const [elevationPoints, setElevationPoints] = useState<ElevationPoint[] | null>(null);
+  const [elevationPoints, setElevationPoints] = useState<
+    ElevationPoint[] | null
+  >(null);
   const [elevationLoading, setElevationLoading] = useState(false);
-  const [hoverPoint, setHoverPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [hoverPoint, setHoverPoint] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [center, setCenter] = useState<[number, number]>(() => {
     const cached = loadCachedView();
     return cached ? [cached.lat, cached.lng] : DEFAULT_CENTER;
@@ -99,7 +117,13 @@ function App() {
     return cached?.zoom ?? DEFAULT_ZOOM;
   });
 
-  const { trails: rawTrails, loading, error, fetch: fetchTrails, clear: clearTrails } = useOverpass();
+  const {
+    trails: rawTrails,
+    loading,
+    error,
+    fetch: fetchTrails,
+    clear: clearTrails,
+  } = useOverpass();
 
   useEffect(() => {
     if (loadCachedView()) return;
@@ -110,8 +134,10 @@ function App() {
         setCenter([pos.coords.latitude, pos.coords.longitude]);
         setZoom(13);
       },
-      () => { /* silently ignore */ },
-      { timeout: 5000, maximumAge: 300000 }
+      () => {
+        /* silently ignore */
+      },
+      { timeout: 5000, maximumAge: 300000 },
     );
   }, []);
 
@@ -123,7 +149,10 @@ function App() {
     return all;
   }, [removedBatches]);
 
-  const startKey = startLat != null && startLng != null ? pointKey(startLat, startLng) : undefined;
+  const startKey =
+    startLat != null && startLng != null
+      ? pointKey(startLat, startLng)
+      : undefined;
 
   const logicalGraph = useMemo(() => {
     if (!graph) return null;
@@ -177,7 +206,9 @@ function App() {
     };
   }, [graph]);
 
-  const [showDebugGraph, setShowDebugGraph] = useState<'raw' | 'logical' | false>(false);
+  const [showDebugGraph, setShowDebugGraph] = useState<
+    'raw' | 'logical' | false
+  >(false);
   const debugGraph = useMemo<Graph | null>(() => {
     if (!graph) return null;
     if (showDebugGraph === 'raw') return graph;
@@ -185,11 +216,14 @@ function App() {
     return null;
   }, [graph, logicalGraph, showDebugGraph]);
 
-  const handleDrawEnd = useCallback((newBbox: Bbox, coords?: [number, number][]) => {
-    setBbox(newBbox);
-    setPolygonCoords(coords ?? null);
-    setDrawing(false);
-  }, []);
+  const handleDrawEnd = useCallback(
+    (newBbox: Bbox, coords?: [number, number][]) => {
+      setBbox(newBbox);
+      setPolygonCoords(coords ?? null);
+      setDrawing(false);
+    },
+    [],
+  );
 
   const handleToggleDraw = useCallback(() => {
     setDrawing((prev) => !prev);
@@ -235,16 +269,19 @@ function App() {
         fetchTrails(bbox, checked);
       }
     },
-    [bbox, rawTrails, fetchTrails]
+    [bbox, rawTrails, fetchTrails],
   );
 
-  const handleFeatureClick = useCallback((featureId: string) => {
-    if (!graph) return;
-    const newGraph = removeLogicalEdge(graph, logicalGraph, featureId);
-    setGraph(newGraph);
-    setRemovedBatches((prev) => [...prev, new Set([featureId])]);
-    setCppResult(null);
-  }, [graph, logicalGraph]);
+  const handleFeatureClick = useCallback(
+    (featureId: string) => {
+      if (!graph) return;
+      const newGraph = removeLogicalEdge(graph, logicalGraph, featureId);
+      setGraph(newGraph);
+      setRemovedBatches((prev) => [...prev, new Set([featureId])]);
+      setCppResult(null);
+    },
+    [graph, logicalGraph],
+  );
 
   const handleRestoreRemoved = useCallback(() => {
     if (!rawTrails) return;
@@ -353,6 +390,14 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Optimal Trace</h1>
+        <a
+          className="commit-hash"
+          href={`https://github.com/anishathalye/optimal-trace/commit/${__COMMIT_HASH__}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {__COMMIT_HASH__}
+        </a>
         <span>Chinese Postman Route Planner</span>
       </header>
       <div className="app-main">
@@ -430,9 +475,7 @@ function App() {
                 <dt>West</dt>
                 <dd>{formatCoord(bbox.west)}</dd>
               </dl>
-              <p className="sidebar-note">
-                ~{formatArea(bboxArea(bbox))}
-              </p>
+              <p className="sidebar-note">~{formatArea(bboxArea(bbox))}</p>
             </div>
           )}
 
@@ -478,14 +521,18 @@ function App() {
               </div>
 
               <div className="sidebar-section">
-                <button className="btn btn-secondary" onClick={handleClearTrails}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleClearTrails}
+                >
                   Clear Trails
                 </button>
                 <button
                   className={`btn btn-secondary ${erasing ? 'btn-danger' : ''}`}
-              onClick={() => {
-                setErasing((prev) => !prev);
-              }}>
+                  onClick={() => {
+                    setErasing((prev) => !prev);
+                  }}
+                >
                   {erasing ? 'Erasing\u2026 click to stop' : 'Erase'}
                 </button>
                 {removedBatches.length > 0 && (
@@ -494,7 +541,10 @@ function App() {
                   </button>
                 )}
                 {removedIds.size > 0 && (
-                  <button className="btn btn-secondary" onClick={handleRestoreRemoved}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleRestoreRemoved}
+                  >
                     Restore all
                   </button>
                 )}
@@ -514,13 +564,13 @@ function App() {
                 className={`btn ${selectingStart ? 'btn-active' : ''}`}
                 onClick={handleToggleSelectStart}
               >
-                {selectingStart ? 'Click map to set start\u2026' : 'Set Start Point'}
+                {selectingStart
+                  ? 'Click map to set start\u2026'
+                  : 'Set Start Point'}
               </button>
               {startLat != null && (
                 <p className="sidebar-note">
-                  Start point set.
-                  {' '}
-                  ({startLat.toFixed(5)},{' '}
+                  Start point set. ({startLat.toFixed(5)},{' '}
                   {startLng?.toFixed(5)})
                 </p>
               )}
@@ -565,7 +615,9 @@ function App() {
                       value={showDebugGraph === false ? '' : showDebugGraph}
                       onChange={(e) => {
                         const v = e.target.value;
-                        setShowDebugGraph(v === 'raw' || v === 'logical' ? v : false);
+                        setShowDebugGraph(
+                          v === 'raw' || v === 'logical' ? v : false,
+                        );
                       }}
                     >
                       <option value="">Off</option>
@@ -577,7 +629,10 @@ function App() {
               </div>
 
               {startNodeId && !cppResult && !solving && (
-                <button className="btn btn-primary" onClick={handleComputeRoute}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleComputeRoute}
+                >
                   Compute Route
                 </button>
               )}
@@ -606,17 +661,28 @@ function App() {
                       {cppResult.totalDistance > cppResult.uniqueDistance && (
                         <>
                           <dt>Retraced</dt>
-                          <dd>{formatDistance(cppResult.totalDistance - cppResult.uniqueDistance)}</dd>
+                          <dd>
+                            {formatDistance(
+                              cppResult.totalDistance -
+                                cppResult.uniqueDistance,
+                            )}
+                          </dd>
                         </>
                       )}
                     </dl>
                   </div>
 
                   <div className="sidebar-section">
-                    <button className="btn btn-primary" onClick={handleExportGPX}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleExportGPX}
+                    >
                       Download GPX
                     </button>
-                    <button className="btn btn-secondary" onClick={handleClearRoute}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleClearRoute}
+                    >
                       Clear Route
                     </button>
                   </div>
@@ -627,8 +693,8 @@ function App() {
 
           {!bbox && !rawTrails && (
             <p className="sidebar-placeholder">
-              Select an area on the map, then fetch trails.
-              Select a starting point, and compute the optimal route covering every trail.
+              Select an area on the map, then fetch trails. Select a starting
+              point, and compute the optimal route covering every trail.
             </p>
           )}
         </aside>
@@ -638,7 +704,14 @@ function App() {
         <ElevationProfile points={elevationPoints} onHover={setHoverPoint} />
       )}
       {elevationLoading && (
-        <div className="elevation-profile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          className="elevation-profile"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <p className="sidebar-loading">Loading elevation&hellip;</p>
         </div>
       )}

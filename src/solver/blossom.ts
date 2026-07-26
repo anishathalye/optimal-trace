@@ -77,11 +77,17 @@ class Edmonds {
               }
             } else if (this.label[this.inBlossom[w]] === 1) {
               const b = this.inBlossom[v];
-              if (this.bestEdge[b] === -1 || this.slack(k) < this.slack(this.bestEdge[b])) {
+              if (
+                this.bestEdge[b] === -1 ||
+                this.slack(k) < this.slack(this.bestEdge[b])
+              ) {
                 this.bestEdge[b] = k;
               }
             } else if (this.label[w] === 0) {
-              if (this.bestEdge[w] === -1 || this.slack(k) < this.slack(this.bestEdge[w])) {
+              if (
+                this.bestEdge[w] === -1 ||
+                this.slack(k) < this.slack(this.bestEdge[w])
+              ) {
                 this.bestEdge[w] = k;
               }
             }
@@ -107,7 +113,11 @@ class Edmonds {
           }
         }
         for (let b = 0; b < 2 * this.nVertex; b++) {
-          if (this.blossomParent[b] === -1 && this.label[b] === 1 && this.bestEdge[b] !== -1) {
+          if (
+            this.blossomParent[b] === -1 &&
+            this.label[b] === 1 &&
+            this.bestEdge[b] !== -1
+          ) {
             const kSlack = this.slack(this.bestEdge[b]);
             const d = kSlack / 2;
             if (deltaType === -1 || d < delta) {
@@ -118,7 +128,12 @@ class Edmonds {
           }
         }
         for (let b = this.nVertex; b < this.nVertex * 2; b++) {
-          if (this.blossomBase[b] >= 0 && this.blossomParent[b] === -1 && this.label[b] === 2 && (deltaType === -1 || this.dualVar[b] < delta)) {
+          if (
+            this.blossomBase[b] >= 0 &&
+            this.blossomParent[b] === -1 &&
+            this.label[b] === 2 &&
+            (deltaType === -1 || this.dualVar[b] < delta)
+          ) {
             delta = this.dualVar[b];
             deltaType = 4;
             deltaBlossom = b;
@@ -167,7 +182,12 @@ class Edmonds {
       }
       if (!augmented) break;
       for (let b = this.nVertex; b < this.nVertex * 2; b++) {
-        if (this.blossomParent[b] === -1 && this.blossomBase[b] >= 0 && this.label[b] === 1 && this.dualVar[b] === 0) {
+        if (
+          this.blossomParent[b] === -1 &&
+          this.blossomBase[b] >= 0 &&
+          this.label[b] === 1 &&
+          this.dualVar[b] === 0
+        ) {
           this.expandBlossom(b, true);
         }
       }
@@ -224,7 +244,7 @@ class Edmonds {
     let base = -1;
     while (v !== -1 || w !== -1) {
       let b = this.inBlossom[v];
-      if ((this.label[b] & 4)) {
+      if (this.label[b] & 4) {
         base = this.blossomBase[b];
         break;
       }
@@ -324,7 +344,12 @@ class Edmonds {
             i = i ^ j;
           }
           const bj = this.inBlossom[j];
-          if (bj !== b && this.label[bj] === 1 && (bestEdgeTo[bj] === -1 || this.slack(k2) < this.slack(bestEdgeTo[bj]))) {
+          if (
+            bj !== b &&
+            this.label[bj] === 1 &&
+            (bestEdgeTo[bj] === -1 ||
+              this.slack(k2) < this.slack(bestEdgeTo[bj]))
+          ) {
             bestEdgeTo[bj] = k2;
           }
         }
@@ -343,7 +368,10 @@ class Edmonds {
     this.bestEdge[b] = -1;
     for (let ii = 0; ii < this.blossomBestEdges[b].length; ii++) {
       const k2 = this.blossomBestEdges[b][ii];
-      if (this.bestEdge[b] === -1 || this.slack(k2) < this.slack(this.bestEdge[b])) {
+      if (
+        this.bestEdge[b] === -1 ||
+        this.slack(k2) < this.slack(this.bestEdge[b])
+      ) {
         this.bestEdge[b] = k2;
       }
     }
@@ -372,7 +400,7 @@ class Edmonds {
       let j = this.blossomChilds[b].indexOf(entryChild);
       let jStep: number;
       let endpTrick: number;
-      if ((j & 1)) {
+      if (j & 1) {
         j -= this.blossomChilds[b].length;
         jStep = 1;
         endpTrick = 0;
@@ -383,9 +411,14 @@ class Edmonds {
       let p = this.labelEnd[b];
       while (j !== 0) {
         this.label[this.endpoint[p ^ 1]] = 0;
-        this.label[this.endpoint[pIndex(this.blossomEndPs[b], j - endpTrick) ^ endpTrick ^ 1]] = 0;
+        this.label[
+          this.endpoint[
+            pIndex(this.blossomEndPs[b], j - endpTrick) ^ endpTrick ^ 1
+          ]
+        ] = 0;
         this.assignLabel(this.endpoint[p ^ 1], 2, p);
-        this.allowEdge[~~(pIndex(this.blossomEndPs[b], j - endpTrick) / 2)] = true;
+        this.allowEdge[~~(pIndex(this.blossomEndPs[b], j - endpTrick) / 2)] =
+          true;
         j += jStep;
         p = pIndex(this.blossomEndPs[b], j - endpTrick) ^ endpTrick;
         this.allowEdge[~~(p / 2)] = true;
@@ -435,7 +468,7 @@ class Edmonds {
     let j = i;
     let jStep: number;
     let endpTrick: number;
-    if ((i & 1)) {
+    if (i & 1) {
       j -= this.blossomChilds[b].length;
       jStep = 1;
       endpTrick = 0;
@@ -458,8 +491,12 @@ class Edmonds {
       this.mate[this.endpoint[p]] = p ^ 1;
       this.mate[this.endpoint[p ^ 1]] = p;
     }
-    this.blossomChilds[b] = this.blossomChilds[b].slice(i).concat(this.blossomChilds[b].slice(0, i));
-    this.blossomEndPs[b] = this.blossomEndPs[b].slice(i).concat(this.blossomEndPs[b].slice(0, i));
+    this.blossomChilds[b] = this.blossomChilds[b]
+      .slice(i)
+      .concat(this.blossomChilds[b].slice(0, i));
+    this.blossomEndPs[b] = this.blossomEndPs[b]
+      .slice(i)
+      .concat(this.blossomEndPs[b].slice(0, i));
     this.blossomBase[b] = this.blossomBase[this.blossomChilds[b][0]];
   }
 
@@ -619,7 +656,10 @@ function pIndex<T>(arr: T[], idx: number): T {
   return idx < 0 ? arr[arr.length + idx] : arr[idx];
 }
 
-function blossom(edges: [number, number, number][], maxCardinality: boolean): number[] {
+function blossom(
+  edges: [number, number, number][],
+  maxCardinality: boolean,
+): number[] {
   if (edges.length === 0) {
     return [];
   }

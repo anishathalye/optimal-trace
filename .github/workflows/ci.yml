@@ -1,0 +1,67 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * 6'
+jobs:
+  typecheck:
+    runs-on: ubuntu-24.04
+    name: Type check
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  format:
+    runs-on: ubuntu-24.04
+    name: Format
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+
+  lint:
+    runs-on: ubuntu-24.04
+    name: Lint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  build:
+    runs-on: ubuntu-24.04
+    name: Build
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  test:
+    runs-on: ubuntu-24.04
+    name: Test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test

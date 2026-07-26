@@ -4,11 +4,14 @@ import { pointKey } from '../graph/types';
 import type { Graph } from '../graph/types';
 import { haversineDistance } from '../utils/geo';
 
-function makeGraph(
-  edges: Array<[[number, number], [number, number]]>
-): Graph {
+function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   const nodes = new Map<string, { lat: number; lng: number }>();
-  const graphEdges: Array<{ from: string; to: string; weight: number; coords: [number, number][] }> = [];
+  const graphEdges: Array<{
+    from: string;
+    to: string;
+    weight: number;
+    coords: [number, number][];
+  }> = [];
   const adjacency = new Map<string, Map<string, number>>();
 
   for (const [[lng1, lat1], [lng2, lat2]] of edges) {
@@ -18,7 +21,15 @@ function makeGraph(
     nodes.set(key2, { lat: lat2, lng: lng2 });
 
     const weight = haversineDistance(lat1, lng1, lat2, lng2);
-    graphEdges.push({ from: key1, to: key2, weight, coords: [[lng1, lat1], [lng2, lat2]] });
+    graphEdges.push({
+      from: key1,
+      to: key2,
+      weight,
+      coords: [
+        [lng1, lat1],
+        [lng2, lat2],
+      ],
+    });
 
     if (!adjacency.has(key1)) adjacency.set(key1, new Map());
     if (!adjacency.has(key2)) adjacency.set(key2, new Map());
@@ -32,8 +43,14 @@ function makeGraph(
 describe('dijkstra', () => {
   it('finds shortest path on a simple line', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
     ]);
     const src = pointKey(0, 0);
     const { distances } = dijkstra(g, src);
@@ -44,8 +61,14 @@ describe('dijkstra', () => {
 
   it('handles disconnected component', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.002, 0], [0.003, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.002, 0],
+        [0.003, 0],
+      ],
     ]);
     const src = pointKey(0, 0);
     const { distances } = dijkstra(g, src);
@@ -55,8 +78,14 @@ describe('dijkstra', () => {
 
   it('reconstructs path correctly', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
     ]);
     const src = pointKey(0, 0);
     const target = pointKey(0, 0.002);

@@ -11,8 +11,22 @@ export interface Bbox {
   east: number;
 }
 
-const TRAIL_TAGS = ['path', 'footway', 'track', 'bridleway', 'steps', 'cycleway'] as const;
-const ROAD_TAGS = ['residential', 'unclassified', 'tertiary', 'service', 'living_street', 'pedestrian'] as const;
+const TRAIL_TAGS = [
+  'path',
+  'footway',
+  'track',
+  'bridleway',
+  'steps',
+  'cycleway',
+] as const;
+const ROAD_TAGS = [
+  'residential',
+  'unclassified',
+  'tertiary',
+  'service',
+  'living_street',
+  'pedestrian',
+] as const;
 
 function buildQuery(bbox: Bbox, includeRoads: boolean): string {
   const { south, west, north, east } = bbox;
@@ -30,7 +44,7 @@ function buildQuery(bbox: Bbox, includeRoads: boolean): string {
 export async function fetchTrails(
   bbox: Bbox,
   includeRoads = false,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const query = buildQuery(bbox, includeRoads);
   const encoded = encodeURIComponent(query);
@@ -59,9 +73,13 @@ export async function fetchTrails(
       return await response.json();
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      lastError = new Error('Could not reach the Overpass API. Check your connection or try again later.');
+      lastError = new Error(
+        'Could not reach the Overpass API. Check your connection or try again later.',
+      );
     }
   }
 
-  throw lastError ?? new Error('Failed to fetch trails from all available servers.');
+  throw (
+    lastError ?? new Error('Failed to fetch trails from all available servers.')
+  );
 }

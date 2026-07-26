@@ -3,7 +3,7 @@ import { type Graph } from './types';
 export function removeLogicalEdge(
   rawGraph: Graph,
   logicalGraph: Graph | null,
-  logicalEdgeId: string
+  logicalEdgeId: string,
 ): Graph {
   if (!logicalGraph) return rawGraph;
 
@@ -15,7 +15,9 @@ export function removeLogicalEdge(
   if (!logicalEdge) return rawGraph;
 
   const coordSet = new Set(
-    logicalEdge.coords.map(([lng, lat]) => `${lat.toFixed(6)},${lng.toFixed(6)}`)
+    logicalEdge.coords.map(
+      ([lng, lat]) => `${lat.toFixed(6)},${lng.toFixed(6)}`,
+    ),
   );
 
   const newEdges = rawGraph.edges.filter((e) => {

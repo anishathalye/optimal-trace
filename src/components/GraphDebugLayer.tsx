@@ -7,7 +7,11 @@ interface GraphDebugLayerProps {
   showEdges: boolean;
 }
 
-function GraphDebugLayer({ graph, showNodes, showEdges }: GraphDebugLayerProps) {
+function GraphDebugLayer({
+  graph,
+  showNodes,
+  showEdges,
+}: GraphDebugLayerProps) {
   return (
     <>
       {showEdges &&

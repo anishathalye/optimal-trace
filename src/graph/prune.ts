@@ -1,4 +1,4 @@
-import { pointKey, type Graph, type Node, type Edge } from './types';
+import type { Graph, Edge } from './types';
 import { haversineDistance } from '../utils/geo';
 
 function copyGraph(graph: Graph): Graph {
@@ -17,9 +17,7 @@ function degree(graph: Graph, nodeId: string): number {
 
 function findEdge(graph: Graph, from: string, to: string): Edge | undefined {
   return graph.edges.find(
-    (e) =>
-      (e.from === from && e.to === to) ||
-      (e.from === to && e.to === from)
+    (e) => (e.from === from && e.to === to) || (e.from === to && e.to === from),
   );
 }
 
@@ -29,11 +27,18 @@ function removeEdge(graph: Graph, edge: Edge) {
 
   graph.adjacency.get(edge.from)?.delete(edge.to);
   graph.adjacency.get(edge.to)?.delete(edge.from);
-  if (graph.adjacency.get(edge.from)?.size === 0) graph.adjacency.delete(edge.from);
+  if (graph.adjacency.get(edge.from)?.size === 0)
+    graph.adjacency.delete(edge.from);
   if (graph.adjacency.get(edge.to)?.size === 0) graph.adjacency.delete(edge.to);
 }
 
-function addEdge(graph: Graph, from: string, to: string, coords: [number, number][], weight: number) {
+function addEdge(
+  graph: Graph,
+  from: string,
+  to: string,
+  coords: [number, number][],
+  weight: number,
+) {
   const edge: Edge = { from, to, weight, coords };
   graph.edges.push(edge);
 
@@ -48,7 +53,9 @@ function addEdge(graph: Graph, from: string, to: string, coords: [number, number
 }
 
 function joinCoords(
-  e1: Edge, e2: Edge, commonNode: string
+  e1: Edge,
+  e2: Edge,
+  commonNode: string,
 ): [number, number][] {
   const c1 = [...e1.coords];
   const c2 = [...e2.coords];
@@ -107,8 +114,10 @@ export function pruneGraph(input: Graph, preserveKey?: string): Graph {
       let combinedWeight = 0;
       for (let i = 1; i < combinedCoords.length; i++) {
         combinedWeight += haversineDistance(
-          combinedCoords[i - 1][1], combinedCoords[i - 1][0],
-          combinedCoords[i][1], combinedCoords[i][0]
+          combinedCoords[i - 1][1],
+          combinedCoords[i - 1][0],
+          combinedCoords[i][1],
+          combinedCoords[i][0],
         );
       }
 

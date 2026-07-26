@@ -5,11 +5,14 @@ import type { Graph } from '../graph/types';
 import { oddDegreeNodes } from '../graph/utils';
 import { haversineDistance } from '../utils/geo';
 
-function makeGraph(
-  edges: Array<[[number, number], [number, number]]>
-): Graph {
+function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   const nodes = new Map<string, { lat: number; lng: number }>();
-  const graphEdges: Array<{ from: string; to: string; weight: number; coords: [number, number][] }> = [];
+  const graphEdges: Array<{
+    from: string;
+    to: string;
+    weight: number;
+    coords: [number, number][];
+  }> = [];
   const adjacency = new Map<string, Map<string, number>>();
 
   for (const [[lng1, lat1], [lng2, lat2]] of edges) {
@@ -19,7 +22,15 @@ function makeGraph(
     nodes.set(key2, { lat: lat2, lng: lng2 });
 
     const weight = haversineDistance(lat1, lng1, lat2, lng2);
-    graphEdges.push({ from: key1, to: key2, weight, coords: [[lng1, lat1], [lng2, lat2]] });
+    graphEdges.push({
+      from: key1,
+      to: key2,
+      weight,
+      coords: [
+        [lng1, lat1],
+        [lng2, lat2],
+      ],
+    });
 
     if (!adjacency.has(key1)) adjacency.set(key1, new Map());
     if (!adjacency.has(key2)) adjacency.set(key2, new Map());
@@ -37,7 +48,10 @@ function firstNode(graph: Graph): string {
 describe('solveCPP', () => {
   it('solves already-Eulerian graph (line)', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
     ]);
     const start = firstNode(g);
     const result = solveCPP(g, start);
@@ -47,9 +61,18 @@ describe('solveCPP', () => {
 
   it('solves single triangle (all even degree)', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.0005, 0.001]],
-      [[0.0005, 0.001], [0, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.0005, 0.001],
+      ],
+      [
+        [0.0005, 0.001],
+        [0, 0],
+      ],
     ]);
     const start = firstNode(g);
     const result = solveCPP(g, start);
@@ -58,8 +81,14 @@ describe('solveCPP', () => {
 
   it('solves graph with two odd-degree nodes', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
     ]);
     const start = firstNode(g);
     const result = solveCPP(g, start);
@@ -69,10 +98,22 @@ describe('solveCPP', () => {
 
   it('solves graph with four odd-degree nodes (two chains)', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
-      [[0, 0.001], [0.001, 0.001]],
-      [[0.001, 0.001], [0.002, 0.001]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
+      [
+        [0, 0.001],
+        [0.001, 0.001],
+      ],
+      [
+        [0.001, 0.001],
+        [0.002, 0.001],
+      ],
     ]);
     const start = firstNode(g);
     const odd = oddDegreeNodes(g);
@@ -85,10 +126,22 @@ describe('solveCPP', () => {
 
   it('regression: blossom matching on four odd-degree nodes does not throw', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
-      [[0, 0.001], [0.001, 0.001]],
-      [[0.001, 0.001], [0.002, 0.001]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
+      [
+        [0, 0.001],
+        [0.001, 0.001],
+      ],
+      [
+        [0.001, 0.001],
+        [0.002, 0.001],
+      ],
     ]);
     const start = firstNode(g);
     expect(() => solveCPP(g, start)).not.toThrow();
@@ -96,12 +149,30 @@ describe('solveCPP', () => {
 
   it('regression: expandBlossom path with six odd-degree nodes', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
-      [[0, 0.001], [0.001, 0.001]],
-      [[0.001, 0.001], [0.002, 0.001]],
-      [[0, 0.002], [0.001, 0.002]],
-      [[0.001, 0.002], [0.002, 0.002]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
+      [
+        [0, 0.001],
+        [0.001, 0.001],
+      ],
+      [
+        [0.001, 0.001],
+        [0.002, 0.001],
+      ],
+      [
+        [0, 0.002],
+        [0.001, 0.002],
+      ],
+      [
+        [0.001, 0.002],
+        [0.002, 0.002],
+      ],
     ]);
     const start = firstNode(g);
     expect(() => solveCPP(g, start)).not.toThrow();
@@ -109,8 +180,14 @@ describe('solveCPP', () => {
 
   it('regression: retraced segments are marked in out-and-back', () => {
     const g = makeGraph([
-      [[0, 0], [0.001, 0]],
-      [[0.001, 0], [0.002, 0]],
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.002, 0],
+      ],
     ]);
     const start = firstNode(g);
     const result = solveCPP(g, start);

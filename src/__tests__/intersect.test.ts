@@ -40,10 +40,20 @@ describe('findAllIntersections', () => {
   it('handles many segments', () => {
     const segments: RawSegment[] = [];
     for (let i = 0; i < 50; i++) {
-      segments.push({ a: [i * 0.01, 0], b: [i * 0.01, 1], featureIdx: i, segmentIdx: 0 });
+      segments.push({
+        a: [i * 0.01, 0],
+        b: [i * 0.01, 1],
+        featureIdx: i,
+        segmentIdx: 0,
+      });
     }
     for (let i = 0; i < 50; i++) {
-      segments.push({ a: [0, i * 0.01], b: [1, i * 0.01], featureIdx: 50 + i, segmentIdx: 0 });
+      segments.push({
+        a: [0, i * 0.01],
+        b: [1, i * 0.01],
+        featureIdx: 50 + i,
+        segmentIdx: 0,
+      });
     }
     const result = findAllIntersections(segments);
     expect(result.size).toBeGreaterThan(0);

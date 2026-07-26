@@ -7,7 +7,12 @@ import { haversineDistance } from '../utils/geo';
 
 function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   const nodes = new Map<string, { lat: number; lng: number }>();
-  const graphEdges: Array<{ from: string; to: string; weight: number; coords: [number, number][] }> = [];
+  const graphEdges: Array<{
+    from: string;
+    to: string;
+    weight: number;
+    coords: [number, number][];
+  }> = [];
   const adjacency = new Map<string, Map<string, number>>();
 
   for (const [[lng1, lat1], [lng2, lat2]] of edges) {
@@ -17,7 +22,15 @@ function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
     nodes.set(key2, { lat: lat2, lng: lng2 });
 
     const weight = haversineDistance(lat1, lng1, lat2, lng2);
-    graphEdges.push({ from: key1, to: key2, weight, coords: [[lng1, lat1], [lng2, lat2]] });
+    graphEdges.push({
+      from: key1,
+      to: key2,
+      weight,
+      coords: [
+        [lng1, lat1],
+        [lng2, lat2],
+      ],
+    });
 
     if (!adjacency.has(key1)) adjacency.set(key1, new Map());
     if (!adjacency.has(key2)) adjacency.set(key2, new Map());
@@ -35,8 +48,14 @@ function edgeKey(a: string, b: string): string {
 describe('removeLogicalEdge', () => {
   it('removes chain using logical graph coords', () => {
     const raw = makeGraph([
-      [[0, 0], [1, 0]],
-      [[1, 0], [2, 0]],
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
     ]);
     const logical = pruneGraph(raw);
     const a = pointKey(0, 0);
@@ -48,9 +67,18 @@ describe('removeLogicalEdge', () => {
 
   it('removes direct edge using logical graph coords', () => {
     const raw = makeGraph([
-      [[0, 0], [1, 0]],
-      [[1, 0], [2, 0]],
-      [[2, 0], [0, 0]],
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+      [
+        [2, 0],
+        [0, 0],
+      ],
     ]);
     const logical = pruneGraph(raw);
     const a = pointKey(0, 0);
@@ -65,7 +93,10 @@ describe('removeLogicalEdge', () => {
 
   it('returns graph unchanged when no logical graph provided', () => {
     const raw = makeGraph([
-      [[0, 0], [1, 0]],
+      [
+        [0, 0],
+        [1, 0],
+      ],
     ]);
     const a = pointKey(0, 0);
     const b = pointKey(0, 1);

@@ -1,0 +1,67 @@
+name: Deploy
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+  deploy:
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+  links:
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: github-pages
+          path: ./artifact
+      - name: Extract artifact
+        run: |
+          mkdir -p ./site
+          cd ./artifact
+          tar -xf artifact.tar -C ../site
+      - uses: anishathalye/proof-html@v2
+        with:
+          check_html: false
+          check_css: false
+          directory: ./site
+          tokens: |
+            {"https://github.com": "${{ secrets.GITHUB_TOKEN }}"}
+          swap_urls: |
+            {"^https:\\/\\/optimal-trace\\.anish\\.io/": "/",
+             "^(https:\\/\\/github\\.com/.*)#.*$": "\\1"}
+          allow_missing_href: true
+          ignore_url: |
+            https://fonts.gstatic.com

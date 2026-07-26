@@ -18,10 +18,10 @@ Rickey Gates divided San Francisco into roughly 20–30-mile sections, inspected
 
 This approach is surprisingly reasonable when the goal is exploration rather than mathematical optimality:
 
-* Divide the area into manageable geographic tiles.
-* Work through each tile systematically.
-* Keep a master coverage map.
-* Accept some duplication between days.
+- Divide the area into manageable geographic tiles.
+- Work through each tile systematically.
+- Keep a master coverage map.
+- Accept some duplication between days.
 
 CityStrides provides completion tracking and manual route building for streets, while Wandrer tracks new roads and paths from uploaded hikes, runs, and rides. Neither is primarily an exact whole-network optimizer. ([Wandrer][3])
 
@@ -88,10 +88,10 @@ For a specified start and different finish, the parity correction is modified so
 
 **OSMnx + NetworkX + GeoPandas + gpxpy**
 
-* **OSMnx** downloads and models OpenStreetMap walking/trail networks, clips them to polygons, simplifies intersections, adds elevation, and converts networks to GeoDataFrames. It also supports custom Overpass filters, which is useful for selecting `path`, `footway`, `track`, `bridleway`, and `steps` features. ([OSMnx][9])
-* **NetworkX** handles shortest paths, minimum-weight matching, graph connectivity, and Euler circuits. ([NetworkX][8])
-* **GeoPandas/QGIS** are useful for visually correcting the topology.
-* **gpxpy** or similar libraries can create a GPX route for a watch or navigation app.
+- **OSMnx** downloads and models OpenStreetMap walking/trail networks, clips them to polygons, simplifies intersections, adds elevation, and converts networks to GeoDataFrames. It also supports custom Overpass filters, which is useful for selecting `path`, `footway`, `track`, `bridleway`, and `steps` features. ([OSMnx][9])
+- **NetworkX** handles shortest paths, minimum-weight matching, graph connectivity, and Euler circuits. ([NetworkX][8])
+- **GeoPandas/QGIS** are useful for visually correcting the topology.
+- **gpxpy** or similar libraries can create a GPX route for a watch or navigation app.
 
 The older `postman_problems` package implements CPP and a restricted form of RPP, but its documentation states that the RPP solver only handles cases where required edges form one connected component, and its tested Python versions are dated. I would use it as a worked reference rather than the foundation of a new project. ([GitHub][10])
 
@@ -111,8 +111,8 @@ The plugin is labeled experimental, and its latest listed release is from 2019, 
 
 For tracking completed coverage:
 
-* **Wandrer** is better suited than most street-only tools to mixed hikes, runs, and rides. ([Wandrer][3])
-* **CityStrides** provides a useful completion map and unfinished-street display, although it is oriented toward streets. ([The CityStrides Community][12])
+- **Wandrer** is better suited than most street-only tools to mixed hikes, runs, and rides. ([Wandrer][3])
+- **CityStrides** provides a useful completion map and unfinished-street display, although it is oriented toward streets. ([The CityStrides Community][12])
 
 For editing and following the final GPX, Gaia GPS, CalTopo, Komoot, OsmAnd, Garmin, or another offline-capable hiking navigator can be used. The Pacific Spirit project used Gaia and CalTopo to clean and construct the practical route before and after optimization. ([Medium][5])
 
@@ -124,11 +124,11 @@ For Rural, Windy, Mixed, multi-day, or constraint-heavy versions, formulate the 
 
 Before solving, choose the edge cost carefully:
 
-* **Distance:** easiest; gives the standard exact CPP.
-* **Estimated travel time:** often more useful for hiking.
-* **Effort:** distance plus ascent, surface difficulty, or technicality.
-* **Convenience:** penalize road walking, dangerous crossings, poor trailheads, or remote sections.
-* **Reliability:** reward routes that revisit water, food, toilets, or bailout points.
+- **Distance:** easiest; gives the standard exact CPP.
+- **Estimated travel time:** often more useful for hiking.
+- **Effort:** distance plus ascent, surface difficulty, or technicality.
+- **Convenience:** penalize road walking, dangerous crossings, poor trailheads, or remote sections.
+- **Reliability:** reward routes that revisit water, food, toilets, or bailout points.
 
 A trail’s uphill and downhill costs are different. Once direction-dependent costs are introduced, the problem becomes a Windy or Mixed Postman variant rather than the simple undirected CPP. The Pacific Spirit author explicitly identified this issue when considering elevation optimization. ([Medium][5])
 
@@ -151,30 +151,30 @@ A useful practical compromise is:
 
 ## Particularly relevant reading
 
-* **Edmonds and Johnson, “Matching, Euler Tours and the Chinese Postman” (1973):** the foundational matching-based exact algorithm. ([Springer][1])
-* **Eiselt, Gendreau, and Laporte, “Arc Routing Problems, Part I: The Chinese Postman Problem” (1995):** a strong survey covering undirected, directed, windy, mixed, and hierarchical variants. 
-* **Eiselt, Gendreau, and Laporte, “Arc Routing Problems, Part II: The Rural Postman Problem” (1995):** the natural reference when only selected trails are mandatory. ([PubsOnline][14])
-* **Pearn and Wu, “Algorithms for the Rural Postman Problem”:** algorithms and complexity for required subsets of edges. ([ScienceDirect][7])
-* **Thimbleby, “The Directed Chinese Postman Problem”:** includes executable methods and an open-route variant. ([Harold Thimbleby][15])
-* **“#everystreet algorithm”:** a direct application of odd-vertex matching and Eulerization to an every-street running challenge. ([Every Street Challenge][16])
-* **Agarwal and Akella, “The Single Robot Line Coverage Problem”:** a more recent treatment of asymmetric edge coverage using integer programming and approximation algorithms. ([arXiv][17])
+- **Edmonds and Johnson, “Matching, Euler Tours and the Chinese Postman” (1973):** the foundational matching-based exact algorithm. ([Springer][1])
+- **Eiselt, Gendreau, and Laporte, “Arc Routing Problems, Part I: The Chinese Postman Problem” (1995):** a strong survey covering undirected, directed, windy, mixed, and hierarchical variants.
+- **Eiselt, Gendreau, and Laporte, “Arc Routing Problems, Part II: The Rural Postman Problem” (1995):** the natural reference when only selected trails are mandatory. ([PubsOnline][14])
+- **Pearn and Wu, “Algorithms for the Rural Postman Problem”:** algorithms and complexity for required subsets of edges. ([ScienceDirect][7])
+- **Thimbleby, “The Directed Chinese Postman Problem”:** includes executable methods and an open-route variant. ([Harold Thimbleby][15])
+- **“#everystreet algorithm”:** a direct application of odd-vertex matching and Eulerization to an every-street running challenge. ([Every Street Challenge][16])
+- **Agarwal and Akella, “The Single Robot Line Coverage Problem”:** a more recent treatment of asymmetric edge coverage using integer programming and approximation algorithms. ([arXiv][17])
 
 For a first implementation, I would use **QGIS for graph cleanup, OSMnx for importing the area, NetworkX for an exact distance-based CPP, and Gaia/CalTopo/OsmAnd for final GPX inspection and navigation**.
 
-[1]: https://link.springer.com/article/10.1007/BF01580113?utm_source=chatgpt.com "Matching, Euler tours and the Chinese postman | Mathematical ... - Springer"
-[2]: https://www.everysinglestreet.com/why "Why? How? — every•single•street"
-[3]: https://wandrer.earth/ "Wandrer"
-[4]: https://brooksandrew.github.io/simpleblog/articles/sleeping-giant-rural-postman-problem/ "Sleeping Giant Rural Postman Problem – andrew brooks"
-[5]: https://medium.com/%40sean.mckay.314/rural-chinese-postman-problem-ultra-optimization-using-networkx-and-osmnx-b245764db2b2 "Medium"
-[6]: https://codeforces.com/blog/entry/154192 "Chinese Postman Problem: How I Ran a 180 km Ultramarathon Through Every Street in My City - Codeforces"
-[7]: https://www.sciencedirect.com/science/article/pii/030505489400070O?utm_source=chatgpt.com "Algorithms for the rural postman problem - ScienceDirect"
-[8]: https://networkx.org/documentation/latest/reference/algorithms/generated/networkx.algorithms.euler.eulerian_circuit.html "eulerian_circuit — NetworkX 3.7rc0.dev0 documentation"
-[9]: https://osmnx.readthedocs.io/en/stable/ "OSMnx 2.1.1 documentation"
-[10]: https://github.com/brooksandrew/postman_problems "GitHub - brooksandrew/postman_problems: Graph optimization solvers for the Postman Problems · GitHub"
-[11]: https://plugins.qgis.org/plugins/chinesepostman/ "Chinese Postman Solver — QGIS Python Plugins Repository"
-[12]: https://community.citystrides.com/t/manual-step-by-step-guide/27980 "Manual / step-by-step guide - Wiki - The CityStrides Community"
-[13]: https://developers.google.com/optimization/?utm_source=chatgpt.com "OR-Tools | Google for Developers"
-[14]: https://pubsonline.informs.org/doi/pdf/10.1287/opre.43.3.399?utm_source=chatgpt.com "Arc routing problems, part II: The rural postman problem."
-[15]: https://harold.thimbleby.net/cpp/SPAEcpp.pdf?utm_source=chatgpt.com "The directed Chinese Postman Problem - Thimbleby"
-[16]: https://www.everystreetchallenge.com/everystreet_algorithm.pdf?utm_source=chatgpt.com "#everystreet algorithm - Every Street Challenge"
-[17]: https://arxiv.org/abs/2208.09861?utm_source=chatgpt.com "The Single Robot Line Coverage Problem: Theory, Algorithms, and Experiments"
+[1]: https://link.springer.com/article/10.1007/BF01580113?utm_source=chatgpt.com 'Matching, Euler tours and the Chinese postman | Mathematical ... - Springer'
+[2]: https://www.everysinglestreet.com/why 'Why? How? — every•single•street'
+[3]: https://wandrer.earth/ 'Wandrer'
+[4]: https://brooksandrew.github.io/simpleblog/articles/sleeping-giant-rural-postman-problem/ 'Sleeping Giant Rural Postman Problem – andrew brooks'
+[5]: https://medium.com/%40sean.mckay.314/rural-chinese-postman-problem-ultra-optimization-using-networkx-and-osmnx-b245764db2b2 'Medium'
+[6]: https://codeforces.com/blog/entry/154192 'Chinese Postman Problem: How I Ran a 180 km Ultramarathon Through Every Street in My City - Codeforces'
+[7]: https://www.sciencedirect.com/science/article/pii/030505489400070O?utm_source=chatgpt.com 'Algorithms for the rural postman problem - ScienceDirect'
+[8]: https://networkx.org/documentation/latest/reference/algorithms/generated/networkx.algorithms.euler.eulerian_circuit.html 'eulerian_circuit — NetworkX 3.7rc0.dev0 documentation'
+[9]: https://osmnx.readthedocs.io/en/stable/ 'OSMnx 2.1.1 documentation'
+[10]: https://github.com/brooksandrew/postman_problems 'GitHub - brooksandrew/postman_problems: Graph optimization solvers for the Postman Problems · GitHub'
+[11]: https://plugins.qgis.org/plugins/chinesepostman/ 'Chinese Postman Solver — QGIS Python Plugins Repository'
+[12]: https://community.citystrides.com/t/manual-step-by-step-guide/27980 'Manual / step-by-step guide - Wiki - The CityStrides Community'
+[13]: https://developers.google.com/optimization/?utm_source=chatgpt.com 'OR-Tools | Google for Developers'
+[14]: https://pubsonline.informs.org/doi/pdf/10.1287/opre.43.3.399?utm_source=chatgpt.com 'Arc routing problems, part II: The rural postman problem.'
+[15]: https://harold.thimbleby.net/cpp/SPAEcpp.pdf?utm_source=chatgpt.com 'The directed Chinese Postman Problem - Thimbleby'
+[16]: https://www.everystreetchallenge.com/everystreet_algorithm.pdf?utm_source=chatgpt.com '#everystreet algorithm - Every Street Challenge'
+[17]: https://arxiv.org/abs/2208.09861?utm_source=chatgpt.com 'The Single Robot Line Coverage Problem: Theory, Algorithms, and Experiments'

@@ -11,7 +11,9 @@ function RouteLayer({ segments }: RouteLayerProps) {
       {segments.map((seg, i) => (
         <Polyline
           key={`route-seg-${i}`}
-          positions={seg.coords.map(([lng, lat]) => [lat, lng] as [number, number])}
+          positions={seg.coords.map(
+            ([lng, lat]) => [lat, lng] as [number, number],
+          )}
           pathOptions={{
             color: seg.retraced ? '#f59e0b' : '#22c55e',
             weight: 5,

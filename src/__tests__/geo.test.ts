@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { haversineDistance, trailDistance, filterByMinLength } from '../utils/geo';
+import {
+  haversineDistance,
+  trailDistance,
+  filterByMinLength,
+} from '../utils/geo';
 
 describe('haversineDistance', () => {
   it('returns 0 for identical points', () => {
@@ -30,7 +34,11 @@ describe('trailDistance', () => {
         {
           geometry: {
             type: 'LineString' as const,
-            coordinates: [[0, 0], [0, 1], [0, 2]] as [number, number][],
+            coordinates: [
+              [0, 0],
+              [0, 1],
+              [0, 2],
+            ] as [number, number][],
           },
           properties: {},
         },
@@ -44,7 +52,10 @@ describe('trailDistance', () => {
     const trails = {
       features: [
         {
-          geometry: { type: 'Point' as const, coordinates: [0, 0] as [number, number] },
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [0, 0] as [number, number],
+          },
           properties: {},
         },
       ],
@@ -56,14 +67,32 @@ describe('trailDistance', () => {
 describe('filterByMinLength', () => {
   it('returns all features when minLength is 0', () => {
     const features = [
-      { geometry: { type: 'LineString' as const, coordinates: [[0, 0], [0, 1]] as [number, number][] }, properties: {} },
+      {
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: [
+            [0, 0],
+            [0, 1],
+          ] as [number, number][],
+        },
+        properties: {},
+      },
     ];
     expect(filterByMinLength(features, 0).length).toBe(1);
   });
 
   it('filters out short segments', () => {
     const features = [
-      { geometry: { type: 'LineString' as const, coordinates: [[0, 0], [0, 0.00001]] as [number, number][] }, properties: {} },
+      {
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: [
+            [0, 0],
+            [0, 0.00001],
+          ] as [number, number][],
+        },
+        properties: {},
+      },
     ];
     expect(filterByMinLength(features, 100).length).toBe(0);
   });

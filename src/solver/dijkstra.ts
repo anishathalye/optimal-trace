@@ -2,7 +2,7 @@ import type { Graph } from '../graph/types';
 
 export function dijkstra(
   graph: Graph,
-  source: string
+  source: string,
 ): { distances: Map<string, number>; previous: Map<string, string | null> } {
   const distances = new Map<string, number>();
   const previous = new Map<string, string | null>();
@@ -50,7 +50,7 @@ export function dijkstra(
 
 export function reconstructPath(
   previous: Map<string, string | null>,
-  target: string
+  target: string,
 ): string[] {
   const path: string[] = [];
   let current: string | null = target;

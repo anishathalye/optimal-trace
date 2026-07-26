@@ -28,13 +28,18 @@ function allPairsShortestPaths(graph: Graph, nodes: string[]): AllPairs {
   return result;
 }
 
-function matchOddNodes(oddNodes: string[], allPairs: AllPairs): [string, string][] {
+function matchOddNodes(
+  oddNodes: string[],
+  allPairs: AllPairs,
+): [string, string][] {
   const n = oddNodes.length;
   if (n === 0) return [];
   if (n === 2) return [[oddNodes[0], oddNodes[1]]];
 
   let maxDist = 0;
-  const distances: number[][] = Array.from({ length: n }, () => new Array(n).fill(Infinity));
+  const distances: number[][] = Array.from({ length: n }, () =>
+    new Array(n).fill(Infinity),
+  );
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
@@ -79,7 +84,7 @@ function addEdgeCount(
   counts: Map<string, Map<string, number>>,
   u: string,
   v: string,
-  delta: number
+  delta: number,
 ) {
   if (!counts.has(u)) counts.set(u, new Map());
   if (!counts.has(v)) counts.set(v, new Map());
@@ -93,7 +98,7 @@ function addEdgeCount(
 function decrementEdge(
   adj: Map<string, Map<string, number>>,
   u: string,
-  v: string
+  v: string,
 ) {
   const countU = adj.get(u)?.get(v) ?? 0;
   const countV = adj.get(v)?.get(u) ?? 0;
@@ -114,7 +119,7 @@ function decrementEdge(
 }
 
 function cloneEdgeCounts(
-  source: Map<string, Map<string, number>>
+  source: Map<string, Map<string, number>>,
 ): Map<string, Map<string, number>> {
   const clone = new Map<string, Map<string, number>>();
   for (const [u, neighbors] of source) {
@@ -125,7 +130,7 @@ function cloneEdgeCounts(
 
 function eulerCircuit(
   augmented: Map<string, Map<string, number>>,
-  start: string
+  start: string,
 ): string[] {
   if (!augmented.has(start)) {
     for (const [key] of augmented) {
@@ -232,7 +237,11 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
       if (isForward) {
         segCoords.push(...edgeCoords);
         for (let j = 0; j < edgeCoords.length; j++) {
-          if (coords.length === 0 || coords[coords.length - 1][0] !== edgeCoords[j][0] || coords[coords.length - 1][1] !== edgeCoords[j][1]) {
+          if (
+            coords.length === 0 ||
+            coords[coords.length - 1][0] !== edgeCoords[j][0] ||
+            coords[coords.length - 1][1] !== edgeCoords[j][1]
+          ) {
             coords.push(edgeCoords[j]);
           }
         }
@@ -240,7 +249,11 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
         const reversed = [...edgeCoords].reverse();
         segCoords.push(...reversed);
         for (let j = 0; j < reversed.length; j++) {
-          if (coords.length === 0 || coords[coords.length - 1][0] !== reversed[j][0] || coords[coords.length - 1][1] !== reversed[j][1]) {
+          if (
+            coords.length === 0 ||
+            coords[coords.length - 1][0] !== reversed[j][0] ||
+            coords[coords.length - 1][1] !== reversed[j][1]
+          ) {
             coords.push(reversed[j]);
           }
         }
