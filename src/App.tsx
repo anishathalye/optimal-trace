@@ -100,6 +100,7 @@ function App() {
   const [startLng, setStartLng] = useState<number | null>(null);
   const [cppResult, setCppResult] = useState<CPPResult | null>(null);
   const [solving, setSolving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [elevationPoints, setElevationPoints] = useState<
     ElevationPoint[] | null
   >(null);
@@ -354,6 +355,7 @@ function App() {
   const handleComputeRoute = useCallback(() => {
     if (!logicalGraph || !startNodeId) return;
     setSolving(true);
+    setPreviewing(false);
     setTimeout(() => {
       try {
         const result = solveCPP(logicalGraph, startNodeId);
@@ -375,6 +377,7 @@ function App() {
     setCppResult(null);
     setElevationPoints(null);
     setHoverPoint(null);
+    setPreviewing(false);
   }, []);
 
   const handleExportGPX = useCallback(() => {
@@ -382,6 +385,14 @@ function App() {
     const gpx = generateGPX(cppResult.coords, 'Optimal Trace Route');
     downloadGPX(gpx, 'optimal-trace-route.gpx');
   }, [cppResult]);
+
+  const handleStartPreview = useCallback(() => {
+    setPreviewing(true);
+  }, []);
+
+  const handlePreviewEnd = useCallback(() => {
+    setPreviewing(false);
+  }, []);
 
   const trailDist = trails ? trailDistance(trails) : 0;
   const numTrails = trails ? trailCount(trails) : 0;
@@ -414,6 +425,9 @@ function App() {
             selectingStart={selectingStart}
             erasing={erasing}
             routeSegments={cppResult?.segments ?? null}
+            routeCoords={cppResult?.coords ?? null}
+            previewing={previewing}
+            onPreviewEnd={handlePreviewEnd}
             hoverPoint={hoverPoint}
             onDrawEnd={handleDrawEnd}
             onFeatureClick={handleFeatureClick}
@@ -677,6 +691,12 @@ function App() {
                       onClick={handleExportGPX}
                     >
                       Download GPX
+                    </button>
+                    <button
+                      className={`btn ${previewing ? 'btn-active' : ''}`}
+                      onClick={handleStartPreview}
+                    >
+                      {previewing ? 'Playing preview\u2026' : 'Preview Route'}
                     </button>
                     <button
                       className="btn btn-secondary"

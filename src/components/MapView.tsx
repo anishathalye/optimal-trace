@@ -18,6 +18,7 @@ import TrailLayer from './TrailLayer';
 import GraphDebugLayer from './GraphDebugLayer';
 import EraserTool from './EraserTool';
 import RouteLayer from './RouteLayer';
+import PreviewLayer from './PreviewLayer';
 import type { RouteSegment } from '../solver/cpp';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
 import type { Graph } from '../graph/types';
@@ -175,6 +176,9 @@ interface MapViewProps {
   selectingStart: boolean;
   erasing: boolean;
   routeSegments: RouteSegment[] | null;
+  routeCoords: [number, number][] | null;
+  previewing: boolean;
+  onPreviewEnd: () => void;
   hoverPoint: { lat: number; lng: number } | null;
   polygonCoords: [number, number][] | null;
   onDrawEnd: (bbox: Bbox, polygonCoords?: [number, number][]) => void;
@@ -199,6 +203,9 @@ function MapView({
   selectingStart,
   erasing,
   routeSegments,
+  routeCoords,
+  previewing,
+  onPreviewEnd,
   hoverPoint,
   onDrawEnd,
   onFeatureClick,
@@ -250,7 +257,15 @@ function MapView({
           onEraseFeature={onEraseFeature}
         />
       )}
-      {routeSegments && <RouteLayer segments={routeSegments} />}
+      {routeSegments && !previewing && <RouteLayer segments={routeSegments} />}
+      {routeSegments && routeCoords && (
+        <PreviewLayer
+          segments={routeSegments}
+          coords={routeCoords}
+          active={previewing}
+          onEnd={onPreviewEnd}
+        />
+      )}
       {graph && (
         <GraphDebugLayer
           graph={graph}
