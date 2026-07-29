@@ -15,7 +15,7 @@ function RouteLayer({ segments }: RouteLayerProps) {
             ([lng, lat]) => [lat, lng] as [number, number],
           )}
           pathOptions={{
-            color: seg.retraced ? '#f59e0b' : '#22c55e',
+            color: seg.retraced ? '#f59e0b' : '#8b5cf6',
             weight: 5,
             opacity: 0.9,
           }}
