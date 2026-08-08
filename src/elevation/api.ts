@@ -1,6 +1,8 @@
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
 
-const BATCH_SIZE = 90;
+const BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 150;
+const MAX_RETRIES = 3;
 
 export interface ElevationPoint {
   lng: number;
@@ -28,6 +30,41 @@ function haversineDistance(
   return R * c;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchBatch(
+  lats: string,
+  lngs: string,
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const url = `${ELEVATION_URL}?latitude=${lats}&longitude=${lngs}`;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, { signal });
+
+    if (res.ok) {
+      const json = await res.json();
+      return (json.elevation ?? []) as number[];
+    }
+
+    if (res.status !== 429) {
+      throw new Error(`Elevation API returned ${res.status}`);
+    }
+
+    if (attempt === MAX_RETRIES) break;
+
+    const retryAfter = res.headers.get('Retry-After');
+    const waitMs = retryAfter
+      ? parseInt(retryAfter, 10) * 1000
+      : BATCH_DELAY_MS * (attempt + 1);
+    await delay(waitMs);
+  }
+
+  throw new Error('Elevation API rate limited after retries');
+}
+
 export async function fetchElevationForAllCoords(
   coords: [number, number][],
   signal?: AbortSignal,
@@ -39,15 +76,11 @@ export async function fetchElevationForAllCoords(
     const lats = batch.map(([, lat]) => lat.toFixed(6)).join(',');
     const lngs = batch.map(([lng]) => lng.toFixed(6)).join(',');
 
-    const url = `${ELEVATION_URL}?latitude=${lats}&longitude=${lngs}`;
-    const res = await fetch(url, { signal });
-
-    if (!res.ok) {
-      throw new Error(`Elevation API returned ${res.status}`);
+    if (i > 0) {
+      await delay(BATCH_DELAY_MS);
     }
 
-    const json = await res.json();
-    const elevs: number[] = json.elevation ?? [];
+    const elevs = await fetchBatch(lats, lngs, signal);
     for (let j = 0; j < elevs.length; j++) {
       elevations[i + j] = elevs[j];
     }
