@@ -17,7 +17,7 @@ import {
 } from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
-import { fetchElevationProfile, type ElevationPoint } from './elevation/api';
+import { fetchElevationProfile, fetchElevationForAllCoords, type ElevationPoint } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
 import { removeLogicalEdge } from './graph/mutate';
 
@@ -105,6 +105,7 @@ function App() {
     ElevationPoint[] | null
   >(null);
   const [elevationLoading, setElevationLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [hoverPoint, setHoverPoint] = useState<{
     lat: number;
     lng: number;
@@ -380,10 +381,17 @@ function App() {
     setPreviewing(false);
   }, []);
 
-  const handleExportGPX = useCallback(() => {
+  const handleExportGPX = useCallback(async () => {
     if (!cppResult) return;
-    const gpx = generateGPX(cppResult.coords, 'Optimal Trace Route');
-    downloadGPX(gpx, 'optimal-trace-route.gpx');
+    setExporting(true);
+    try {
+      const elevations = await fetchElevationForAllCoords(cppResult.coords);
+      const gpx = generateGPX(cppResult.coords, 'Optimal Trace Route', elevations);
+      downloadGPX(gpx, 'optimal-trace-route.gpx');
+    } catch (err) {
+      console.error('GPX export failed:', err);
+    }
+    setExporting(false);
   }, [cppResult]);
 
   const handleStartPreview = useCallback(() => {
@@ -689,8 +697,9 @@ function App() {
                     <button
                       className="btn btn-primary"
                       onClick={handleExportGPX}
+                      disabled={exporting}
                     >
-                      Download GPX
+                      {exporting ? 'Exporting\u2026' : 'Download GPX'}
                     </button>
                     <button
                       className={`btn ${previewing ? 'btn-active' : ''}`}

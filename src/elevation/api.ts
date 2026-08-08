@@ -1,6 +1,7 @@
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
 
 const BATCH_SIZE = 90;
+const EXPORT_BATCH_SIZE = 90;
 
 export interface ElevationPoint {
   lng: number;
@@ -84,6 +85,34 @@ export async function fetchElevationProfile(
   }
 
   return result;
+}
+
+export async function fetchElevationForAllCoords(
+  coords: [number, number][],
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const elevations: number[] = new Array(coords.length);
+
+  for (let i = 0; i < coords.length; i += EXPORT_BATCH_SIZE) {
+    const batch = coords.slice(i, Math.min(i + EXPORT_BATCH_SIZE, coords.length));
+    const lats = batch.map(([, lat]) => lat.toFixed(6)).join(',');
+    const lngs = batch.map(([lng]) => lng.toFixed(6)).join(',');
+
+    const url = `${ELEVATION_URL}?latitude=${lats}&longitude=${lngs}`;
+    const res = await fetch(url, { signal });
+
+    if (!res.ok) {
+      throw new Error(`Elevation API returned ${res.status}`);
+    }
+
+    const json = await res.json();
+    const elevs: number[] = json.elevation ?? [];
+    for (let j = 0; j < elevs.length; j++) {
+      elevations[i + j] = elevs[j];
+    }
+  }
+
+  return elevations;
 }
 
 function sampleCoords(
