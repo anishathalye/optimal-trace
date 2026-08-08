@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import './App.css';
 import MapView from './components/MapView';
 import type { Bbox, DrawMode } from './components/DrawControl';
@@ -17,7 +17,11 @@ import {
 } from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
 import { generateGPX, downloadGPX } from './export/gpx';
-import { fetchElevationProfile, fetchElevationForAllCoords, type ElevationPoint } from './elevation/api';
+import {
+  fetchElevationForAllCoords,
+  buildElevationProfile,
+  type ElevationPoint,
+} from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
 import { removeLogicalEdge } from './graph/mutate';
 
@@ -105,6 +109,8 @@ function App() {
     ElevationPoint[] | null
   >(null);
   const [elevationLoading, setElevationLoading] = useState(false);
+  const [fullElevations, setFullElevations] = useState<number[] | null>(null);
+  const elevationAbortRef = useRef<AbortController | null>(null);
   const [exporting, setExporting] = useState(false);
   const [hoverPoint, setHoverPoint] = useState<{
     lat: number;
@@ -141,6 +147,14 @@ function App() {
       },
       { timeout: 5000, maximumAge: 300000 },
     );
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (elevationAbortRef.current) {
+        elevationAbortRef.current.abort();
+      }
+    };
   }, []);
 
   const removedIds = useMemo(() => {
@@ -355,18 +369,44 @@ function App() {
 
   const handleComputeRoute = useCallback(() => {
     if (!logicalGraph || !startNodeId) return;
+
+    if (elevationAbortRef.current) {
+      elevationAbortRef.current.abort();
+    }
+
     setSolving(true);
     setPreviewing(false);
+    setElevationPoints(null);
+    setFullElevations(null);
+
     setTimeout(() => {
       try {
         const result = solveCPP(logicalGraph, startNodeId);
         setCppResult(result);
 
+        const controller = new AbortController();
+        elevationAbortRef.current = controller;
         setElevationLoading(true);
-        fetchElevationProfile(result.coords)
-          .then(setElevationPoints)
-          .catch((err) => console.error('Elevation fetch failed:', err))
-          .finally(() => setElevationLoading(false));
+
+        fetchElevationForAllCoords(result.coords, controller.signal)
+          .then((elevations) => {
+            if (!controller.signal.aborted) {
+              setFullElevations(elevations);
+              setElevationPoints(
+                buildElevationProfile(result.coords, elevations),
+              );
+            }
+          })
+          .catch((err) => {
+            if (!controller.signal.aborted) {
+              console.error('Elevation fetch failed:', err);
+            }
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) {
+              setElevationLoading(false);
+            }
+          });
       } catch (err) {
         console.error('CPP solve failed:', err);
       }
@@ -375,8 +415,13 @@ function App() {
   }, [logicalGraph, startNodeId]);
 
   const handleClearRoute = useCallback(() => {
+    if (elevationAbortRef.current) {
+      elevationAbortRef.current.abort();
+      elevationAbortRef.current = null;
+    }
     setCppResult(null);
     setElevationPoints(null);
+    setFullElevations(null);
     setHoverPoint(null);
     setPreviewing(false);
   }, []);
@@ -385,14 +430,19 @@ function App() {
     if (!cppResult) return;
     setExporting(true);
     try {
-      const elevations = await fetchElevationForAllCoords(cppResult.coords);
-      const gpx = generateGPX(cppResult.coords, 'Optimal Trace Route', elevations);
+      const elevations =
+        fullElevations ?? (await fetchElevationForAllCoords(cppResult.coords));
+      const gpx = generateGPX(
+        cppResult.coords,
+        'Optimal Trace Route',
+        elevations,
+      );
       downloadGPX(gpx, 'optimal-trace-route.gpx');
     } catch (err) {
       console.error('GPX export failed:', err);
     }
     setExporting(false);
-  }, [cppResult]);
+  }, [cppResult, fullElevations]);
 
   const handleStartPreview = useCallback(() => {
     setPreviewing(true);
