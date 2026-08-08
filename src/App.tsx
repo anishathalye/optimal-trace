@@ -109,6 +109,11 @@ function App() {
     ElevationPoint[] | null
   >(null);
   const [elevationLoading, setElevationLoading] = useState(false);
+  const [elevationProgress, setElevationProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [elevationError, setElevationError] = useState<string | null>(null);
   const [fullElevations, setFullElevations] = useState<number[] | null>(null);
   const elevationAbortRef = useRef<AbortController | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -378,6 +383,8 @@ function App() {
     setPreviewing(false);
     setElevationPoints(null);
     setFullElevations(null);
+    setElevationProgress(null);
+    setElevationError(null);
 
     setTimeout(() => {
       try {
@@ -388,7 +395,15 @@ function App() {
         elevationAbortRef.current = controller;
         setElevationLoading(true);
 
-        fetchElevationForAllCoords(result.coords, controller.signal)
+        fetchElevationForAllCoords(
+          result.coords,
+          controller.signal,
+          (done, total) => {
+            if (!controller.signal.aborted) {
+              setElevationProgress({ done, total });
+            }
+          },
+        )
           .then((elevations) => {
             if (!controller.signal.aborted) {
               setFullElevations(elevations);
@@ -399,7 +414,9 @@ function App() {
           })
           .catch((err) => {
             if (!controller.signal.aborted) {
-              console.error('Elevation fetch failed:', err);
+              setElevationError(
+                err instanceof Error ? err.message : 'Elevation fetch failed',
+              );
             }
           })
           .finally(() => {
@@ -414,6 +431,50 @@ function App() {
     }, 0);
   }, [logicalGraph, startNodeId]);
 
+  const handleRetryElevation = useCallback(() => {
+    if (!cppResult) return;
+
+    if (elevationAbortRef.current) {
+      elevationAbortRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    elevationAbortRef.current = controller;
+    setElevationLoading(true);
+    setElevationProgress(null);
+    setElevationError(null);
+
+    fetchElevationForAllCoords(
+      cppResult.coords,
+      controller.signal,
+      (done, total) => {
+        if (!controller.signal.aborted) {
+          setElevationProgress({ done, total });
+        }
+      },
+    )
+      .then((elevations) => {
+        if (!controller.signal.aborted) {
+          setFullElevations(elevations);
+          setElevationPoints(
+            buildElevationProfile(cppResult.coords, elevations),
+          );
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setElevationError(
+            err instanceof Error ? err.message : 'Elevation fetch failed',
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setElevationLoading(false);
+        }
+      });
+  }, [cppResult]);
+
   const handleClearRoute = useCallback(() => {
     if (elevationAbortRef.current) {
       elevationAbortRef.current.abort();
@@ -422,6 +483,8 @@ function App() {
     setCppResult(null);
     setElevationPoints(null);
     setFullElevations(null);
+    setElevationProgress(null);
+    setElevationError(null);
     setHoverPoint(null);
     setPreviewing(false);
   }, []);
@@ -786,11 +849,42 @@ function App() {
           className="elevation-profile"
           style={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <p className="sidebar-loading">Loading elevation&hellip;</p>
+          {elevationProgress ? (
+            <div className="elevation-progress-bar">
+              <div
+                className="elevation-progress-fill"
+                style={{
+                  width: `${Math.round(
+                    (elevationProgress.done / elevationProgress.total) * 100,
+                  )}%`,
+                }}
+              />
+            </div>
+          ) : (
+            <p className="sidebar-loading">Loading elevation&hellip;</p>
+          )}
+        </div>
+      )}
+      {elevationError && !elevationLoading && (
+        <div
+          className="elevation-profile"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <p className="sidebar-error">{elevationError}</p>
+          <button className="btn btn-secondary" onClick={handleRetryElevation}>
+            Retry
+          </button>
         </div>
       )}
     </div>

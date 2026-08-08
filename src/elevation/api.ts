@@ -1,8 +1,8 @@
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
 
 const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 150;
-const MAX_RETRIES = 3;
+const BATCH_DELAY_MS = 1000;
+const MAX_RETRIES = 5;
 
 export interface ElevationPoint {
   lng: number;
@@ -68,6 +68,7 @@ async function fetchBatch(
 export async function fetchElevationForAllCoords(
   coords: [number, number][],
   signal?: AbortSignal,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<number[]> {
   const elevations: number[] = new Array(coords.length);
 
@@ -84,8 +85,11 @@ export async function fetchElevationForAllCoords(
     for (let j = 0; j < elevs.length; j++) {
       elevations[i + j] = elevs[j];
     }
+
+    onProgress?.(i + elevs.length, coords.length);
   }
 
+  onProgress?.(coords.length, coords.length);
   return elevations;
 }
 
