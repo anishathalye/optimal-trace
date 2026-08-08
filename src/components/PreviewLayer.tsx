@@ -10,7 +10,7 @@ interface PreviewLayerProps {
   onEnd: () => void;
 }
 
-const TARGET_SPEED = 225; // m/s
+const TARGET_SPEED = 300; // m/s
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
