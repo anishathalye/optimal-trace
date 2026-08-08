@@ -1,8 +1,9 @@
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
+const CACHE_STORAGE_KEY = 'optimal-trace-elevation-cache';
 
 const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 1000;
-const MAX_RETRIES = 5;
+const BATCH_DELAY_MS = 2000;
+const MAX_RETRIES = 3;
 
 export interface ElevationPoint {
   lng: number;
@@ -32,6 +33,40 @@ function haversineDistance(
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+let elevationCache: Map<string, number> | null = null;
+
+function loadCache(): Map<string, number> {
+  if (elevationCache) return elevationCache;
+  try {
+    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (raw) {
+      const obj: Record<string, number> = JSON.parse(raw);
+      elevationCache = new Map(Object.entries(obj));
+      return elevationCache;
+    }
+  } catch {
+    /* ignore */
+  }
+  elevationCache = new Map();
+  return elevationCache;
+}
+
+function persistCache() {
+  try {
+    const obj: Record<string, number> = {};
+    for (const [k, v] of loadCache()) {
+      obj[k] = v;
+    }
+    localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    /* ignore - storage full or unavailable */
+  }
+}
+
+function coordKey(lat: number, lng: number): string {
+  return `${lat.toFixed(7)},${lng.toFixed(7)}`;
 }
 
 async function fetchBatch(
@@ -71,22 +106,44 @@ export async function fetchElevationForAllCoords(
   onProgress?: (done: number, total: number) => void,
 ): Promise<number[]> {
   const elevations: number[] = new Array(coords.length);
+  const cache = loadCache();
+  const misses: { idx: number; lat: number; lng: number }[] = [];
 
-  for (let i = 0; i < coords.length; i += BATCH_SIZE) {
-    const batch = coords.slice(i, Math.min(i + BATCH_SIZE, coords.length));
-    const lats = batch.map(([, lat]) => lat.toFixed(6)).join(',');
-    const lngs = batch.map(([lng]) => lng.toFixed(6)).join(',');
+  for (let i = 0; i < coords.length; i++) {
+    const [lng, lat] = coords[i];
+    const key = coordKey(lat, lng);
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+      elevations[i] = cached;
+    } else {
+      misses.push({ idx: i, lat, lng });
+    }
+  }
 
+  if (misses.length === 0) {
+    onProgress?.(coords.length, coords.length);
+    return elevations;
+  }
+
+  for (let i = 0; i < misses.length; i += BATCH_SIZE) {
     if (i > 0) {
       await delay(BATCH_DELAY_MS);
     }
 
+    const batch = misses.slice(i, Math.min(i + BATCH_SIZE, misses.length));
+    const lats = batch.map((m) => m.lat.toFixed(6)).join(',');
+    const lngs = batch.map((m) => m.lng.toFixed(6)).join(',');
+
     const elevs = await fetchBatch(lats, lngs, signal);
     for (let j = 0; j < elevs.length; j++) {
-      elevations[i + j] = elevs[j];
+      const { idx, lat, lng } = batch[j];
+      elevations[idx] = elevs[j];
+      cache.set(coordKey(lat, lng), elevs[j]);
     }
+    persistCache();
 
-    onProgress?.(i + elevs.length, coords.length);
+    const resolved = coords.length - misses.length + i + elevs.length;
+    onProgress?.(resolved, coords.length);
   }
 
   onProgress?.(coords.length, coords.length);
