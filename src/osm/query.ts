@@ -35,7 +35,10 @@ function buildQuery(bbox: Bbox, includeRoads: boolean): string {
   const tags = includeRoads ? [...TRAIL_TAGS, ...ROAD_TAGS] : [...TRAIL_TAGS];
 
   const wayBlocks = tags
-    .map((tag) => `  way["highway"="${tag}"]${bboxStr};`)
+    .map((tag) => {
+      const extra = tag === 'footway' ? '["footway"!="sidewalk"]' : '';
+      return `  way["highway"="${tag}"]${extra}${bboxStr};`;
+    })
     .join('\n');
 
   return `[out:json][timeout:45];\n(\n${wayBlocks}\n);\nout geom;`;
