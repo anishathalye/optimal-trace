@@ -1,3 +1,7 @@
+export function coordKey(lat: number, lng: number): string {
+  return `${lat.toFixed(7)},${lng.toFixed(7)}`;
+}
+
 export function haversineDistance(
   lat1: number,
   lng1: number,

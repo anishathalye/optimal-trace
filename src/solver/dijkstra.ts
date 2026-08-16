@@ -3,6 +3,7 @@ import type { Graph } from '../graph/types';
 export function dijkstra(
   graph: Graph,
   source: string,
+  cost?: (from: string, to: string) => number,
 ): { distances: Map<string, number>; previous: Map<string, string | null> } {
   const distances = new Map<string, number>();
   const previous = new Map<string, string | null>();
@@ -34,8 +35,9 @@ export function dijkstra(
     const neighbors = graph.adjacency.get(minNode);
     if (!neighbors) continue;
 
-    for (const [neighbor, weight] of neighbors) {
+    for (const [neighbor, defaultWeight] of neighbors) {
       if (visited.has(neighbor)) continue;
+      const weight = cost ? cost(minNode, neighbor) : defaultWeight;
       const alt = distances.get(minNode)! + weight;
       if (alt < (distances.get(neighbor) ?? Infinity)) {
         distances.set(neighbor, alt);

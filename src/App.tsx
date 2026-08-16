@@ -16,9 +16,18 @@ import {
   totalEdgeDistance,
 } from './graph/utils';
 import { solveCPP, type CPPResult } from './solver/cpp';
+import {
+  elevationLookupFromMap,
+  routeMetricsFromElevations,
+  type ElevationLookup,
+  type RoutingMode,
+} from './solver/costs';
+import { solveWindyCPP } from './solver/windy';
+import { solveLP } from './solver/glpk';
 import { generateGPX, downloadGPX } from './export/gpx';
 import {
   fetchElevationForAllCoords,
+  fetchElevationForGraph,
   buildElevationProfile,
   type ElevationPoint,
 } from './elevation/api';
@@ -87,6 +96,21 @@ function formatDistance(meters: number): string {
   return `${Math.round(feet).toLocaleString()} ft`;
 }
 
+function formatElevation(meters: number): string {
+  const feet = meters * 3.28084;
+  return `${Math.round(feet).toLocaleString()} ft`;
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 60) {
+    return `${Math.round(seconds)} s`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (hours === 0) return `${minutes} min`;
+  return `${hours}h ${minutes}m`;
+}
+
 function App() {
   const [drawing, setDrawing] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode>('rectangle');
@@ -104,6 +128,7 @@ function App() {
   const [startLng, setStartLng] = useState<number | null>(null);
   const [cppResult, setCppResult] = useState<CPPResult | null>(null);
   const [solving, setSolving] = useState(false);
+  const [routeMode, setRouteMode] = useState<RoutingMode>('distance');
   const [previewing, setPreviewing] = useState(false);
   const [elevationPoints, setElevationPoints] = useState<
     ElevationPoint[] | null
@@ -379,23 +404,52 @@ function App() {
       elevationAbortRef.current.abort();
     }
 
+    const controller = new AbortController();
+    elevationAbortRef.current = controller;
+
     setSolving(true);
     setPreviewing(false);
+    setCppResult(null);
     setElevationPoints(null);
     setFullElevations(null);
     setElevationProgress(null);
     setElevationError(null);
 
-    setTimeout(() => {
+    (async () => {
       try {
-        const result = solveCPP(logicalGraph, startNodeId);
+        let elevationOf: ElevationLookup | undefined;
+        if (routeMode !== 'distance') {
+          setElevationLoading(true);
+          const map = await fetchElevationForGraph(
+            logicalGraph,
+            controller.signal,
+            (done, total) => {
+              if (!controller.signal.aborted) {
+                setElevationProgress({ done, total });
+              }
+            },
+          );
+          if (controller.signal.aborted) return;
+          elevationOf = elevationLookupFromMap(map);
+        }
+
+        const result =
+          routeMode === 'time'
+            ? await solveWindyCPP(
+                logicalGraph,
+                startNodeId,
+                elevationOf!,
+                solveLP,
+              )
+            : solveCPP(logicalGraph, startNodeId, {
+                mode: routeMode,
+                elevationOf,
+              });
         setCppResult(result);
 
-        const controller = new AbortController();
-        elevationAbortRef.current = controller;
         setElevationLoading(true);
-
-        fetchElevationForAllCoords(
+        setElevationProgress(null);
+        const elevations = await fetchElevationForAllCoords(
           result.coords,
           controller.signal,
           (done, total) => {
@@ -403,33 +457,36 @@ function App() {
               setElevationProgress({ done, total });
             }
           },
-        )
-          .then((elevations) => {
-            if (!controller.signal.aborted) {
-              setFullElevations(elevations);
-              setElevationPoints(
-                buildElevationProfile(result.coords, elevations),
-              );
-            }
-          })
-          .catch((err) => {
-            if (!controller.signal.aborted) {
-              setElevationError(
-                err instanceof Error ? err.message : 'Elevation fetch failed',
-              );
-            }
-          })
-          .finally(() => {
-            if (!controller.signal.aborted) {
-              setElevationLoading(false);
-            }
-          });
+        );
+        if (controller.signal.aborted) return;
+        setFullElevations(elevations);
+        setElevationPoints(buildElevationProfile(result.coords, elevations));
       } catch (err) {
-        console.error('CPP solve failed:', err);
+        if (!controller.signal.aborted) {
+          console.error('CPP solve failed:', err);
+          setElevationError(
+            err instanceof Error ? err.message : 'Route computation failed',
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setElevationLoading(false);
+        }
+        setSolving(false);
       }
-      setSolving(false);
-    }, 0);
-  }, [logicalGraph, startNodeId]);
+    })();
+  }, [logicalGraph, startNodeId, routeMode]);
+
+  const handleRouteModeChange = useCallback((mode: RoutingMode) => {
+    setRouteMode(mode);
+    setCppResult(null);
+    setElevationPoints(null);
+    setFullElevations(null);
+    setElevationProgress(null);
+    setElevationError(null);
+    setHoverPoint(null);
+    setPreviewing(false);
+  }, []);
 
   const handleRetryElevation = useCallback(() => {
     if (!cppResult) return;
@@ -481,6 +538,7 @@ function App() {
       elevationAbortRef.current = null;
     }
     setCppResult(null);
+    setSolving(false);
     setElevationPoints(null);
     setFullElevations(null);
     setElevationProgress(null);
@@ -517,6 +575,20 @@ function App() {
 
   const trailDist = trails ? trailDistance(trails) : 0;
   const numTrails = trails ? trailCount(trails) : 0;
+
+  const routeStats = useMemo(() => {
+    if (!cppResult) return null;
+
+    const fromProfile =
+      fullElevations && fullElevations.length > 1
+        ? routeMetricsFromElevations(cppResult.coords, fullElevations)
+        : null;
+
+    return {
+      elevationGain: fromProfile?.ascent ?? cppResult.elevationGain,
+      estimatedTime: fromProfile?.time ?? cppResult.estimatedTime,
+    };
+  }, [cppResult, fullElevations]);
 
   return (
     <div className="app">
@@ -762,6 +834,24 @@ function App() {
                 </label>
               </div>
 
+              <div className="sidebar-section">
+                <label className="sidebar-slider">
+                  <span>Routing mode</span>
+                  <select
+                    className="slider-input"
+                    style={{ width: '100%' }}
+                    value={routeMode}
+                    onChange={(e) =>
+                      handleRouteModeChange(e.target.value as RoutingMode)
+                    }
+                  >
+                    <option value="distance">Minimize distance</option>
+                    <option value="elevation">Minimize elevation</option>
+                    <option value="time">Minimize time</option>
+                  </select>
+                </label>
+              </div>
+
               {startNodeId && !cppResult && !solving && (
                 <button
                   className="btn btn-primary"
@@ -792,15 +882,22 @@ function App() {
                       <dd>{formatDistance(cppResult.totalDistance)}</dd>
                       <dt>Unique trails</dt>
                       <dd>{formatDistance(cppResult.uniqueDistance)}</dd>
-                      {cppResult.totalDistance > cppResult.uniqueDistance && (
+                      <dt>Retraced</dt>
+                      <dd>
+                        {formatDistance(
+                          cppResult.totalDistance - cppResult.uniqueDistance,
+                        )}
+                      </dd>
+                      {routeStats?.elevationGain != null && (
                         <>
-                          <dt>Retraced</dt>
-                          <dd>
-                            {formatDistance(
-                              cppResult.totalDistance -
-                                cppResult.uniqueDistance,
-                            )}
-                          </dd>
+                          <dt>Elevation gain</dt>
+                          <dd>{formatElevation(routeStats.elevationGain)}</dd>
+                        </>
+                      )}
+                      {routeStats?.estimatedTime != null && (
+                        <>
+                          <dt>Estimated time</dt>
+                          <dd>{formatDuration(routeStats.estimatedTime)}</dd>
                         </>
                       )}
                     </dl>

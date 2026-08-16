@@ -2,6 +2,12 @@ import type { Graph, Edge } from '../graph/types';
 import { oddDegreeNodes, connectedComponents } from '../graph/utils';
 import { dijkstra, reconstructPath } from './dijkstra';
 import blossom from './blossom';
+import {
+  edgeWeight,
+  routeMetrics,
+  type SymmetricMode,
+  type ElevationLookup,
+} from './costs';
 
 interface PathInfo {
   distance: number;
@@ -10,12 +16,16 @@ interface PathInfo {
 
 type AllPairs = Map<string, Map<string, PathInfo>>;
 
-function allPairsShortestPaths(graph: Graph, nodes: string[]): AllPairs {
+function allPairsShortestPaths(
+  graph: Graph,
+  nodes: string[],
+  cost?: (from: string, to: string) => number,
+): AllPairs {
   const result: AllPairs = new Map();
 
   for (const source of nodes) {
     result.set(source, new Map());
-    const { distances, previous } = dijkstra(graph, source);
+    const { distances, previous } = dijkstra(graph, source, cost);
 
     for (const target of nodes) {
       if (target === source) continue;
@@ -160,7 +170,7 @@ function eulerCircuit(
   return circuit;
 }
 
-function buildEdgeIndex(graph: Graph): Map<string, Map<string, Edge>> {
+export function buildEdgeIndex(graph: Graph): Map<string, Map<string, Edge>> {
   const index = new Map<string, Map<string, Edge>>();
 
   for (const edge of graph.edges) {
@@ -185,37 +195,51 @@ export interface CPPResult {
   totalDistance: number;
   uniqueDistance: number;
   warning: string | null;
+  elevationGain?: number;
+  elevationLoss?: number;
+  estimatedTime?: number;
 }
 
-export function solveCPP(graph: Graph, startNode: string): CPPResult {
-  const components = connectedComponents(graph);
-  let warning: string | null = null;
-  if (components.length > 1) {
-    const unreachable = components.length - 1;
-    warning = `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
-  }
+export interface CPPSolveOptions {
+  mode?: SymmetricMode;
+  elevationOf?: ElevationLookup;
+}
 
-  const oddNodes = oddDegreeNodes(graph);
+function pairKey(u: string, v: string): string {
+  return u < v ? `${u}|${v}` : `${v}|${u}`;
+}
 
-  const allPairs = allPairsShortestPaths(graph, oddNodes);
-  const matching = matchOddNodes(oddNodes, allPairs);
+function buildCostMap(
+  graph: Graph,
+  mode: SymmetricMode,
+  elevationOf?: ElevationLookup,
+): Map<string, number> | null {
+  if (mode === 'distance' || !elevationOf) return null;
 
-  const augmented = new Map<string, Map<string, number>>();
+  const map = new Map<string, number>();
   for (const edge of graph.edges) {
-    addEdgeCount(augmented, edge.from, edge.to, 1);
+    map.set(pairKey(edge.from, edge.to), edgeWeight(edge, mode, elevationOf));
   }
+  return map;
+}
 
-  for (const [u, v] of matching) {
-    const path = allPairs.get(u)?.get(v)?.path;
-    if (!path || path.length < 2) continue;
-    for (let i = 0; i < path.length - 1; i++) {
-      addEdgeCount(augmented, path[i], path[i + 1], 1);
-    }
+function pathMeters(
+  edgeIndex: Map<string, Map<string, Edge>>,
+  path: string[],
+): number {
+  let meters = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const edge = edgeIndex.get(path[i])?.get(path[i + 1]);
+    if (edge) meters += edge.weight;
   }
+  return meters;
+}
 
-  const circuit = eulerCircuit(augmented, startNode);
+export function buildRouteCoords(
+  graph: Graph,
+  circuit: string[],
+): { coords: [number, number][]; segments: RouteSegment[] } {
   const edgeIndex = buildEdgeIndex(graph);
-
   const coords: [number, number][] = [];
   const segments: RouteSegment[] = [];
   const traversed = new Set<string>();
@@ -265,13 +289,59 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
     }
   }
 
+  return { coords, segments };
+}
+
+export function solveCPP(
+  graph: Graph,
+  startNode: string,
+  options: CPPSolveOptions = {},
+): CPPResult {
+  const mode = options.mode ?? 'distance';
+  const elevationOf = options.elevationOf;
+
+  const components = connectedComponents(graph);
+  let warning: string | null = null;
+  if (components.length > 1) {
+    const unreachable = components.length - 1;
+    warning = `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
+  }
+
+  const oddNodes = oddDegreeNodes(graph);
+
+  const costMap = buildCostMap(graph, mode, elevationOf);
+  const cost = costMap
+    ? (u: string, v: string) => costMap.get(pairKey(u, v)) ?? Infinity
+    : undefined;
+
+  const allPairs = allPairsShortestPaths(graph, oddNodes, cost);
+  const matching = matchOddNodes(oddNodes, allPairs);
+
+  const augmented = new Map<string, Map<string, number>>();
+  for (const edge of graph.edges) {
+    addEdgeCount(augmented, edge.from, edge.to, 1);
+  }
+
+  for (const [u, v] of matching) {
+    const path = allPairs.get(u)?.get(v)?.path;
+    if (!path || path.length < 2) continue;
+    for (let i = 0; i < path.length - 1; i++) {
+      addEdgeCount(augmented, path[i], path[i + 1], 1);
+    }
+  }
+
+  const circuit = eulerCircuit(augmented, startNode);
+  const edgeIndex = buildEdgeIndex(graph);
+
+  const { coords, segments } = buildRouteCoords(graph, circuit);
+
   let totalDistance = 0;
   for (const edge of graph.edges) {
     totalDistance += edge.weight;
   }
   for (const [u, v] of matching) {
     const info = allPairs.get(u)?.get(v);
-    if (info) totalDistance += info.distance;
+    if (info) totalDistance += pathMeters(edgeIndex, info.path);
   }
 
   let uniqueDistance = 0;
@@ -279,5 +349,21 @@ export function solveCPP(graph: Graph, startNode: string): CPPResult {
     uniqueDistance += edge.weight;
   }
 
-  return { circuit, coords, segments, totalDistance, uniqueDistance, warning };
+  const result: CPPResult = {
+    circuit,
+    coords,
+    segments,
+    totalDistance,
+    uniqueDistance,
+    warning,
+  };
+
+  if (elevationOf) {
+    const metrics = routeMetrics(coords, elevationOf);
+    result.elevationGain = metrics.ascent;
+    result.elevationLoss = metrics.descent;
+    result.estimatedTime = metrics.time;
+  }
+
+  return result;
 }

@@ -1,3 +1,5 @@
+import type { Graph } from '../graph/types';
+
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
 const CACHE_STORAGE_KEY = 'optimal-trace-elevation-cache';
 
@@ -148,6 +150,40 @@ export async function fetchElevationForAllCoords(
 
   onProgress?.(coords.length, coords.length);
   return elevations;
+}
+
+export async function fetchElevationForGraph(
+  graph: Graph,
+  signal?: AbortSignal,
+  onProgress?: (done: number, total: number) => void,
+): Promise<Map<string, number>> {
+  const unique = new Map<string, [number, number]>();
+
+  for (const edge of graph.edges) {
+    for (const [lng, lat] of edge.coords) {
+      const key = coordKey(lat, lng);
+      if (!unique.has(key)) unique.set(key, [lng, lat]);
+    }
+  }
+
+  for (const node of graph.nodes.values()) {
+    const key = coordKey(node.lat, node.lng);
+    if (!unique.has(key)) unique.set(key, [node.lng, node.lat]);
+  }
+
+  const coords = Array.from(unique.values());
+  const elevations = await fetchElevationForAllCoords(
+    coords,
+    signal,
+    onProgress,
+  );
+
+  const map = new Map<string, number>();
+  for (let i = 0; i < coords.length; i++) {
+    const [lng, lat] = coords[i];
+    map.set(coordKey(lat, lng), elevations[i] ?? 0);
+  }
+  return map;
 }
 
 export function buildElevationProfile(

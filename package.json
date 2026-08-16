@@ -19,6 +19,7 @@
     "@turf/helpers": "^7.3.5",
     "@turf/nearest-point": "^7.3.5",
     "geokdbush": "^2.1.0",
+    "glpk.js": "^5.0.0",
     "graph-data-structure": "^4.5.0",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
