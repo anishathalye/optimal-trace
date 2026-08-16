@@ -32,9 +32,10 @@ import {
   type ElevationPoint,
 } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
-import { removeLogicalEdge } from './graph/mutate';
+import { removeLogicalEdge, buildGraphWithRemovals } from './graph/mutate';
 
 const VIEW_KEY = 'optimal-trace-view';
+const SAVED_SELECTIONS_KEY = 'optimal-trace-selections';
 const DEFAULT_CENTER: [number, number] = [40.0, -105.0];
 const DEFAULT_ZOOM = 11;
 
@@ -42,6 +43,35 @@ interface CachedView {
   lat: number;
   lng: number;
   zoom: number;
+}
+
+interface SavedSelection {
+  trails: GeoJSONFeatureCollection;
+  removedBatches: string[][];
+  savedAt: number;
+}
+
+function loadSavedSelections(): Record<string, SavedSelection> {
+  try {
+    const raw = localStorage.getItem(SAVED_SELECTIONS_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, SavedSelection>;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+
+function persistSavedSelections(selections: Record<string, SavedSelection>) {
+  try {
+    localStorage.setItem(SAVED_SELECTIONS_KEY, JSON.stringify(selections));
+  } catch {
+    /* ignore - storage full or unavailable */
+  }
 }
 
 function loadCachedView(): CachedView | null {
@@ -120,6 +150,9 @@ function App() {
   );
   const [includeRoads, setIncludeRoads] = useState(true);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
+  const [savedSelections, setSavedSelections] =
+    useState<Record<string, SavedSelection>>(loadSavedSelections);
+  const [saveName, setSaveName] = useState('');
   const [erasing, setErasing] = useState(false);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
@@ -161,6 +194,7 @@ function App() {
     error,
     fetch: fetchTrails,
     clear: clearTrails,
+    restore: restoreTrails,
   } = useOverpass();
 
   useEffect(() => {
@@ -220,12 +254,21 @@ function App() {
     return rawTrails;
   }, [logicalGraph, rawTrails]);
 
+  const removedBatchesRef = useRef(removedBatches);
+  useEffect(() => {
+    removedBatchesRef.current = removedBatches;
+  }, [removedBatches]);
+
   useEffect(() => {
     if (!rawTrails) return;
     setBuildingGraph(true);
     setTimeout(() => {
       try {
-        const g = buildGraph(rawTrails.features);
+        const allRemoved = new Set<string>();
+        for (const batch of removedBatchesRef.current) {
+          for (const id of batch) allRemoved.add(id);
+        }
+        const g = buildGraphWithRemovals(rawTrails.features, allRemoved);
         setGraph(g);
         setCppResult(null);
       } catch (err) {
@@ -336,6 +379,59 @@ function App() {
     setStartLat(null);
     setStartLng(null);
   }, [rawTrails]);
+
+  const handleSaveSelection = useCallback(() => {
+    if (!rawTrails) return;
+    const name = saveName.trim();
+    if (!name) return;
+
+    const entry: SavedSelection = {
+      trails: rawTrails,
+      removedBatches: removedBatches.map((batch) => Array.from(batch)),
+      savedAt: Date.now(),
+    };
+    const next = { ...savedSelections, [name]: entry };
+    setSavedSelections(next);
+    persistSavedSelections(next);
+    setSaveName('');
+  }, [rawTrails, removedBatches, savedSelections, saveName]);
+
+  const handleLoadSelection = useCallback(
+    (name: string) => {
+      const entry = savedSelections[name];
+      if (!entry) return;
+
+      if (elevationAbortRef.current) {
+        elevationAbortRef.current.abort();
+        elevationAbortRef.current = null;
+      }
+
+      setRemovedBatches(entry.removedBatches.map((ids) => new Set(ids)));
+      restoreTrails(entry.trails);
+      setStartLat(null);
+      setStartLng(null);
+      setCppResult(null);
+      setElevationPoints(null);
+      setFullElevations(null);
+      setElevationProgress(null);
+      setElevationError(null);
+      setHoverPoint(null);
+      setPreviewing(false);
+      setSelectingStart(false);
+      setErasing(false);
+    },
+    [savedSelections, restoreTrails],
+  );
+
+  const handleDeleteSelection = useCallback(
+    (name: string) => {
+      const next = { ...savedSelections };
+      delete next[name];
+      setSavedSelections(next);
+      persistSavedSelections(next);
+    },
+    [savedSelections],
+  );
 
   const handleUndo = useCallback(() => {
     if (!rawTrails) return;
@@ -762,6 +858,59 @@ function App() {
             <p className="sidebar-hint">
               Click a trail segment on the map to remove it.
             </p>
+          )}
+
+          {(trails || Object.keys(savedSelections).length > 0) && (
+            <div className="sidebar-section">
+              <h3>Saved selections</h3>
+              {trails && (
+                <div className="selection-save-row">
+                  <input
+                    type="text"
+                    className="selection-name-input"
+                    placeholder="Selection name"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveSelection();
+                    }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleSaveSelection}
+                    disabled={!saveName.trim()}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+              {Object.keys(savedSelections).length > 0 && (
+                <ul className="selection-list">
+                  {Object.entries(savedSelections).map(([name, entry]) => (
+                    <li key={name} className="selection-item">
+                      <div className="selection-info">
+                        <span className="selection-name">{name}</span>
+                        <span className="selection-meta">
+                          {trailCount(entry.trails)} segments
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleLoadSelection(name)}
+                      >
+                        Load
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleDeleteSelection(name)}
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {trails && (

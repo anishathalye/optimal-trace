@@ -1,4 +1,22 @@
 import { type Graph } from './types';
+import type { GeoJSONFeature } from '../hooks/useOverpass';
+import buildGraph from './build';
+import { pruneGraph } from './prune';
+
+export function buildGraphWithRemovals(
+  features: GeoJSONFeature[],
+  removedIds: Iterable<string>,
+): Graph {
+  let raw = buildGraph(features);
+  let logical = pruneGraph(raw);
+
+  for (const id of removedIds) {
+    raw = removeLogicalEdge(raw, logical, id);
+    logical = pruneGraph(raw);
+  }
+
+  return raw;
+}
 
 export function removeLogicalEdge(
   rawGraph: Graph,

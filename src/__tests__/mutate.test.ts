@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { removeLogicalEdge } from '../graph/mutate';
+import { removeLogicalEdge, buildGraphWithRemovals } from '../graph/mutate';
+import buildGraph from '../graph/build';
 import { pointKey } from '../graph/types';
 import { pruneGraph } from '../graph/prune';
 import type { Graph } from '../graph/types';
+import type { GeoJSONFeature } from '../hooks/useOverpass';
 import { haversineDistance } from '../utils/geo';
+
+function makeFeature(coords: [number, number][]): GeoJSONFeature {
+  return {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: coords },
+    properties: {},
+  };
+}
 
 function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   const nodes = new Map<string, { lat: number; lng: number }>();
@@ -103,5 +113,25 @@ describe('removeLogicalEdge', () => {
 
     const result = removeLogicalEdge(raw, null, edgeKey(a, b));
     expect(result.edges.length).toBe(1);
+  });
+});
+
+describe('buildGraphWithRemovals', () => {
+  it('rebuilds a graph from features and applies removals', () => {
+    const features = [
+      makeFeature([
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ]),
+    ];
+    const base = buildGraph(features);
+    const logical = pruneGraph(base);
+    const id = edgeKey(pointKey(0, 0), pointKey(0, 2));
+
+    expect(logical.edges.map((e) => edgeKey(e.from, e.to))).toContain(id);
+
+    const result = buildGraphWithRemovals(features, [id]);
+    expect(result.edges.length).toBe(0);
   });
 });

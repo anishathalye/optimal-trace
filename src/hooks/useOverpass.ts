@@ -23,6 +23,7 @@ interface UseOverpassResult {
   error: string | null;
   fetch: (bbox: Bbox, includeRoads: boolean) => void;
   clear: () => void;
+  restore: (trails: GeoJSONFeatureCollection) => void;
 }
 
 export function useOverpass(): UseOverpassResult {
@@ -73,5 +74,15 @@ export function useOverpass(): UseOverpassResult {
     setLoading(false);
   }, []);
 
-  return { trails, loading, error, fetch: fetchFn, clear };
+  const restore = useCallback((trails: GeoJSONFeatureCollection) => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setTrails(trails);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  return { trails, loading, error, fetch: fetchFn, clear, restore };
 }
