@@ -1,10 +1,15 @@
 import type { Graph } from '../graph/types';
 
-const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
-const CACHE_STORAGE_KEY = 'optimal-trace-elevation-cache';
+// USGS 3DEP bare-earth DEM via the ArcGIS ImageServer "identify" endpoint. It
+// accepts a multipoint geometry (batch), requires no API key, and returns
+// 1 m-resolution elevations with CORS enabled. Coverage is the US only;
+// points outside coverage return "NoData" (mapped to 0 below).
+const ELEVATION_URL =
+  'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/identify';
+const CACHE_STORAGE_KEY = 'optimal-trace-elevation-cache-v2';
 
-const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 2000;
+const BATCH_SIZE = 100;
+const RETRY_DELAY_MS = 2000;
 const MAX_RETRIES = 3;
 
 export interface ElevationPoint {
@@ -71,35 +76,53 @@ function coordKey(lat: number, lng: number): string {
   return `${lat.toFixed(7)},${lng.toFixed(7)}`;
 }
 
+export function parseElevationResults(json: unknown): number[] {
+  const data = json as {
+    results?: { value?: string }[];
+    value?: string;
+  };
+  const entries = Array.isArray(data.results) ? data.results : [data];
+  return entries.map((entry) => {
+    const raw = entry.value;
+    if (raw == null || raw === 'NoData') return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  });
+}
+
 async function fetchBatch(
-  lats: string,
-  lngs: string,
+  coords: [number, number][],
   signal?: AbortSignal,
 ): Promise<number[]> {
-  const url = `${ELEVATION_URL}?latitude=${lats}&longitude=${lngs}`;
+  const points = coords.map(([lng, lat]) => [lng, lat]);
+
+  const body = new URLSearchParams();
+  body.set('f', 'json');
+  body.set('geometryType', 'esriGeometryMultipoint');
+  body.set(
+    'geometry',
+    JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
+  );
+  body.set('returnGeometry', 'false');
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(url, { signal });
+    const res = await fetch(ELEVATION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      signal,
+    });
 
     if (res.ok) {
       const json = await res.json();
-      return (json.elevation ?? []) as number[];
-    }
-
-    if (res.status !== 429) {
-      throw new Error(`Elevation API returned ${res.status}`);
+      return parseElevationResults(json);
     }
 
     if (attempt === MAX_RETRIES) break;
-
-    const retryAfter = res.headers.get('Retry-After');
-    const waitMs = retryAfter
-      ? parseInt(retryAfter, 10) * 1000
-      : BATCH_DELAY_MS * (attempt + 1);
-    await delay(waitMs);
+    await delay(RETRY_DELAY_MS * (attempt + 1));
   }
 
-  throw new Error('Elevation API rate limited after retries');
+  throw new Error('Elevation API request failed after retries');
 }
 
 export async function fetchElevationForAllCoords(
@@ -128,15 +151,10 @@ export async function fetchElevationForAllCoords(
   }
 
   for (let i = 0; i < misses.length; i += BATCH_SIZE) {
-    if (i > 0) {
-      await delay(BATCH_DELAY_MS);
-    }
-
     const batch = misses.slice(i, Math.min(i + BATCH_SIZE, misses.length));
-    const lats = batch.map((m) => m.lat.toFixed(6)).join(',');
-    const lngs = batch.map((m) => m.lng.toFixed(6)).join(',');
+    const batchCoords = batch.map((m) => [m.lng, m.lat] as [number, number]);
 
-    const elevs = await fetchBatch(lats, lngs, signal);
+    const elevs = await fetchBatch(batchCoords, signal);
     for (let j = 0; j < elevs.length; j++) {
       const { idx, lat, lng } = batch[j];
       elevations[idx] = elevs[j];

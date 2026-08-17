@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   smoothElevationProfile,
+  elevationGainLoss,
   routeMetrics,
   routeMetricsFromElevations,
   ELEVATION_SMOOTH_WINDOW_M,
+  ELEVATION_THRESHOLD_M,
   type ElevationLookup,
 } from '../solver/costs';
 
@@ -23,6 +25,12 @@ function ascentOf(elevs: number[]): number {
 // Deterministic pseudo-random noise in [-1.5, 1.5] meters.
 function noisyElevation(i: number): number {
   return 100 + ((((i + 1) * 2654435761) >>> 0) % 3000) / 1000 - 1.5;
+}
+
+// Deterministic pseudo-random noise in [-0.5, 0.5] meters (well below the
+// elevation threshold, so it should never register as ascent/descent).
+function smallNoise(i: number): number {
+  return 100 + ((((i + 1) * 2654435761) >>> 0) % 1000) / 1000 - 0.5;
 }
 
 describe('smoothElevationProfile', () => {
@@ -58,16 +66,52 @@ describe('smoothElevationProfile', () => {
 
 describe('routeMetrics smoothing', () => {
   it('reports less ascent than raw sample-to-sample deltas', () => {
-    const coords = lineCoords(200, 0.0001);
+    const n = 400;
+    const coords = lineCoords(n, 0.0001);
     const elevOf: ElevationLookup = (_lat, lng) =>
-      noisyElevation(Math.round(lng / 0.0001));
+      smallNoise(Math.round(lng / 0.0001));
 
     const metrics = routeMetrics(coords, elevOf);
-    const rawAscent = ascentOf(coords.map((_, i) => noisyElevation(i)));
+    const rawAscent = ascentOf(coords.map((_, i) => smallNoise(i)));
 
     expect(rawAscent).toBeGreaterThan(50);
     expect(metrics.ascent).toBeLessThan(rawAscent / 2);
     expect(ELEVATION_SMOOTH_WINDOW_M).toBeGreaterThan(0);
+  });
+});
+
+describe('elevationGainLoss', () => {
+  it('matches the GPS Visualizer trackpoint threshold example', () => {
+    const { ascent, descent } = elevationGainLoss([0, 5, 7, 3, 6, 4, 9], 4);
+    expect(ascent).toBe(9);
+    expect(descent).toBe(0);
+  });
+
+  it('ignores sub-threshold jitter on flat ground', () => {
+    const noisy = Array.from({ length: 100 }, (_, i) =>
+      i % 2 === 0 ? 99.5 : 100.5,
+    );
+    const { ascent, descent } = elevationGainLoss(noisy, ELEVATION_THRESHOLD_M);
+    expect(ascent).toBe(0);
+    expect(descent).toBe(0);
+  });
+
+  it('counts a sustained climb while clipping small decreases', () => {
+    const { ascent, descent } = elevationGainLoss(
+      [0, 10, 9, 20, 19, 30],
+      ELEVATION_THRESHOLD_M,
+    );
+    expect(ascent).toBe(30);
+    expect(descent).toBe(0);
+  });
+
+  it('reports full ascent for a steady climb', () => {
+    const { ascent, descent } = elevationGainLoss(
+      [0, 10, 20, 30, 40],
+      ELEVATION_THRESHOLD_M,
+    );
+    expect(ascent).toBe(40);
+    expect(descent).toBe(0);
   });
 });
 

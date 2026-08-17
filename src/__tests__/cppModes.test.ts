@@ -45,7 +45,7 @@ function firstNode(graph: Graph): string {
   return graph.nodes.keys().next().value!;
 }
 
-const elevationOf: ElevationLookup = (_lat, lng) => lng * 1000;
+const elevationOf: ElevationLookup = (_lat, lng) => lng * 10000;
 
 describe('solveCPP routing modes', () => {
   const graph = makeGraph([
