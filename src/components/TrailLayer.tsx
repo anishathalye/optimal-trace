@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
@@ -55,9 +55,20 @@ function TrailLayer({
     [map, onFeatureClick, disableClicks],
   );
 
+  const coordinateCount = useMemo(
+    () =>
+      trails.features.reduce((total, feature) => {
+        if (feature.geometry.type !== 'LineString') return total;
+        return (
+          total + (feature.geometry.coordinates as [number, number][]).length
+        );
+      }, 0),
+    [trails],
+  );
+
   return (
     <GeoJSON
-      key={`${trails.features.length}-${disableClicks}`}
+      key={`${trails.features.length}-${coordinateCount}-${disableClicks}`}
       data={trails}
       pathOptions={TRAIL_STYLE}
       onEachFeature={onEachFeature}

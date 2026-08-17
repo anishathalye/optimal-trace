@@ -169,6 +169,7 @@ interface MapViewProps {
   drawMode: DrawMode;
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
+  eraserTrails: GeoJSONFeatureCollection | null;
   graph: Graph | null;
   logicalGraph: Graph | null;
   showDebug: boolean;
@@ -196,6 +197,7 @@ function MapView({
   bbox,
   polygonCoords,
   trails,
+  eraserTrails,
   graph,
   logicalGraph,
   showDebug,
@@ -252,7 +254,7 @@ function MapView({
       {trails && (
         <EraserTool
           active={erasing}
-          trails={trails}
+          trails={eraserTrails}
           onEraseStart={onEraseStart}
           onEraseFeature={onEraseFeature}
         />

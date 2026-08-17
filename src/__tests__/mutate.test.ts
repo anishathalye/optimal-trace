@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { removeLogicalEdge, buildGraphWithRemovals } from '../graph/mutate';
+import {
+  removeLogicalEdge,
+  removeRawEdge,
+  removeEdgeById,
+  buildGraphWithRemovals,
+} from '../graph/mutate';
 import buildGraph from '../graph/build';
-import { pointKey } from '../graph/types';
+import { pointKey, PHYSICAL_EDGE_PREFIX } from '../graph/types';
 import { pruneGraph } from '../graph/prune';
 import type { Graph } from '../graph/types';
 import type { GeoJSONFeature } from '../hooks/useOverpass';
@@ -132,6 +137,73 @@ describe('buildGraphWithRemovals', () => {
     expect(logical.edges.map((e) => edgeKey(e.from, e.to))).toContain(id);
 
     const result = buildGraphWithRemovals(features, [id]);
+    expect(result.edges.length).toBe(0);
+  });
+});
+
+describe('removeRawEdge', () => {
+  it('removes a single physical edge by node pair', () => {
+    const raw = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+    ]);
+    const id = edgeKey(pointKey(0, 0), pointKey(0, 1));
+
+    const result = removeRawEdge(raw, id);
+    expect(result.edges.length).toBe(1);
+  });
+
+  it('returns the graph unchanged when the edge is not found', () => {
+    const raw = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+    ]);
+    const result = removeRawEdge(raw, edgeKey(pointKey(0, 0), pointKey(0, 5)));
+    expect(result.edges.length).toBe(1);
+  });
+});
+
+describe('removeEdgeById', () => {
+  it('removes a physical edge for prefixed ids', () => {
+    const raw = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+    ]);
+    const id = PHYSICAL_EDGE_PREFIX + edgeKey(pointKey(0, 0), pointKey(0, 1));
+
+    const result = removeEdgeById(raw, null, id);
+    expect(result.edges.length).toBe(1);
+  });
+
+  it('removes a logical edge for unprefixed ids', () => {
+    const raw = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+    ]);
+    const logical = pruneGraph(raw);
+    const id = edgeKey(pointKey(0, 0), pointKey(0, 2));
+
+    const result = removeEdgeById(raw, logical, id);
     expect(result.edges.length).toBe(0);
   });
 });

@@ -6,6 +6,12 @@ export function pointKey(lat: number, lng: number): string {
   return `${round(lat)},${round(lng)}`;
 }
 
+export const PHYSICAL_EDGE_PREFIX = 'physical:';
+
+export function edgeIdKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
 export interface Node {
   lat: number;
   lng: number;

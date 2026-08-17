@@ -6,7 +6,7 @@ import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
 import { trailDistance, trailCount } from './utils/geo';
 import buildGraph from './graph/build';
-import { graphToFeatures } from './graph/features';
+import { graphToFeatures, graphToPhysicalFeatures } from './graph/features';
 import { pruneGraph } from './graph/prune';
 import type { Graph } from './graph/types';
 import { pointKey } from './graph/types';
@@ -32,7 +32,11 @@ import {
   type ElevationPoint,
 } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
-import { removeLogicalEdge, buildGraphWithRemovals } from './graph/mutate';
+import {
+  removeLogicalEdge,
+  removeEdgeById,
+  buildGraphWithRemovals,
+} from './graph/mutate';
 
 const VIEW_KEY = 'optimal-trace-view';
 const SAVED_SELECTIONS_KEY = 'optimal-trace-selections';
@@ -50,6 +54,8 @@ interface SavedSelection {
   removedBatches: string[][];
   savedAt: number;
 }
+
+type EraserMode = 'logical' | 'physical';
 
 function loadSavedSelections(): Record<string, SavedSelection> {
   try {
@@ -150,6 +156,7 @@ function App() {
   );
   const [includeRoads, setIncludeRoads] = useState(true);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
+  const [eraserMode, setEraserMode] = useState<EraserMode>('logical');
   const [savedSelections, setSavedSelections] =
     useState<Record<string, SavedSelection>>(loadSavedSelections);
   const [saveName, setSaveName] = useState('');
@@ -253,6 +260,13 @@ function App() {
     if (logicalGraph) return graphToFeatures(logicalGraph);
     return rawTrails;
   }, [logicalGraph, rawTrails]);
+
+  const eraserTrails = useMemo(() => {
+    if (eraserMode === 'physical' && graph) {
+      return graphToPhysicalFeatures(graph);
+    }
+    return displayTrails;
+  }, [eraserMode, graph, displayTrails]);
 
   const removedBatchesRef = useRef(removedBatches);
   useEffect(() => {
@@ -437,19 +451,11 @@ function App() {
     if (!rawTrails) return;
     setRemovedBatches((prev) => {
       const next = prev.slice(0, -1);
-      const base = buildGraph(rawTrails.features);
-      const baseLogical = pruneGraph(base);
       const allRemaining = new Set<string>();
       for (const batch of next) {
         for (const id of batch) allRemaining.add(id);
       }
-      let cur = base;
-      let curLogical = baseLogical;
-      for (const id of allRemaining) {
-        cur = removeLogicalEdge(cur, curLogical, id);
-        curLogical = pruneGraph(cur);
-      }
-      setGraph(cur);
+      setGraph(buildGraphWithRemovals(rawTrails.features, allRemaining));
       return next;
     });
   }, [rawTrails]);
@@ -470,7 +476,7 @@ function App() {
     setGraph((g) => {
       if (!g) return g;
       const lg = pruneGraph(g);
-      return removeLogicalEdge(g, lg, featureId);
+      return removeEdgeById(g, lg, featureId);
     });
     setCppResult(null);
   }, []);
@@ -707,6 +713,7 @@ function App() {
             bbox={rawTrails ? null : bbox}
             polygonCoords={rawTrails ? null : polygonCoords}
             trails={displayTrails}
+            eraserTrails={eraserTrails}
             graph={debugGraph}
             logicalGraph={logicalGraph}
             showDebug={showDebugGraph !== false}
@@ -837,6 +844,20 @@ function App() {
                 >
                   {erasing ? 'Erasing\u2026 click to stop' : 'Erase'}
                 </button>
+                <label className="sidebar-slider">
+                  <span>Erase mode</span>
+                  <select
+                    className="slider-input"
+                    style={{ width: '100%' }}
+                    value={eraserMode}
+                    onChange={(e) =>
+                      setEraserMode(e.target.value as EraserMode)
+                    }
+                  >
+                    <option value="logical">Logical segment</option>
+                    <option value="physical">Physical segment</option>
+                  </select>
+                </label>
                 {removedBatches.length > 0 && (
                   <button className="btn btn-secondary" onClick={handleUndo}>
                     Undo
