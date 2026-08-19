@@ -349,9 +349,9 @@ function App() {
       setGraph(null);
       setStartLat(null);
       setStartLng(null);
-      fetchTrails(bbox, includeRoads);
+      fetchTrails(bbox, includeRoads, polygonCoords ?? undefined);
     }
-  }, [bbox, includeRoads, fetchTrails]);
+  }, [bbox, includeRoads, polygonCoords, fetchTrails]);
 
   const handleClearTrails = useCallback(() => {
     setRemovedBatches([]);
@@ -369,10 +369,10 @@ function App() {
         setGraph(null);
         setStartLat(null);
         setStartLng(null);
-        fetchTrails(bbox, checked);
+        fetchTrails(bbox, checked, polygonCoords ?? undefined);
       }
     },
-    [bbox, rawTrails, fetchTrails],
+    [bbox, rawTrails, polygonCoords, fetchTrails],
   );
 
   const handleFeatureClick = useCallback(

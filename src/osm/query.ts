@@ -30,16 +30,27 @@ const ROAD_TAGS = [
   'pedestrian',
 ] as const;
 
-function buildQuery(bbox: Bbox, includeRoads: boolean): string {
-  const { south, west, north, east } = bbox;
-  const bboxStr = `(${south},${west},${north},${east})`;
+function areaSelector(bbox: Bbox, polygon?: [number, number][]): string {
+  if (polygon && polygon.length >= 3) {
+    const points = polygon.map(([lng, lat]) => `${lat} ${lng}`).join(' ');
+    return `(poly:"${points}")`;
+  }
+  return `(${bbox.south},${bbox.west},${bbox.north},${bbox.east})`;
+}
+
+function buildQuery(
+  bbox: Bbox,
+  includeRoads: boolean,
+  polygon?: [number, number][],
+): string {
+  const area = areaSelector(bbox, polygon);
 
   const tags = includeRoads ? [...TRAIL_TAGS, ...ROAD_TAGS] : [...TRAIL_TAGS];
 
   const wayBlocks = tags
     .map((tag) => {
       const extra = tag === 'footway' ? '["footway"!="sidewalk"]' : '';
-      return `  way["highway"="${tag}"]${extra}${bboxStr};`;
+      return `  way["highway"="${tag}"]${extra}${area};`;
     })
     .join('\n');
 
@@ -50,8 +61,9 @@ export async function fetchTrails(
   bbox: Bbox,
   includeRoads = false,
   signal?: AbortSignal,
+  polygon?: [number, number][],
 ): Promise<Record<string, unknown>> {
-  const query = buildQuery(bbox, includeRoads);
+  const query = buildQuery(bbox, includeRoads, polygon);
   const encoded = encodeURIComponent(query);
 
   let lastError: Error | null = null;

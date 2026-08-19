@@ -21,7 +21,11 @@ interface UseOverpassResult {
   trails: GeoJSONFeatureCollection | null;
   loading: boolean;
   error: string | null;
-  fetch: (bbox: Bbox, includeRoads: boolean) => void;
+  fetch: (
+    bbox: Bbox,
+    includeRoads: boolean,
+    polygon?: [number, number][],
+  ) => void;
   clear: () => void;
   restore: (trails: GeoJSONFeatureCollection) => void;
 }
@@ -32,37 +36,49 @@ export function useOverpass(): UseOverpassResult {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchFn = useCallback(async (bbox: Bbox, includeRoads: boolean) => {
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
+  const fetchFn = useCallback(
+    async (bbox: Bbox, includeRoads: boolean, polygon?: [number, number][]) => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    setLoading(true);
-    setError(null);
+      setLoading(true);
+      setError(null);
 
-    try {
-      const raw = await fetchTrails(bbox, includeRoads, controller.signal);
-      const geojson = osmtogeojson(raw) as unknown as GeoJSONFeatureCollection;
+      try {
+        const raw = await fetchTrails(
+          bbox,
+          includeRoads,
+          controller.signal,
+          polygon,
+        );
+        const geojson = osmtogeojson(
+          raw,
+        ) as unknown as GeoJSONFeatureCollection;
 
-      geojson.features = geojson.features.filter((f) => {
-        const t = f.properties;
-        if (t.area === 'yes') return false;
-        if (t.indoor === 'yes') return false;
-        return true;
-      });
+        geojson.features = geojson.features.filter((f) => {
+          const t = f.properties;
+          if (t.area === 'yes') return false;
+          if (t.indoor === 'yes') return false;
+          return true;
+        });
 
-      setTrails(geojson);
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      setError(err instanceof Error ? err.message : 'Failed to fetch trails.');
-    } finally {
-      setLoading(false);
-      abortRef.current = null;
-    }
-  }, []);
+        setTrails(geojson);
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch trails.',
+        );
+      } finally {
+        setLoading(false);
+        abortRef.current = null;
+      }
+    },
+    [],
+  );
 
   const clear = useCallback(() => {
     if (abortRef.current) {
