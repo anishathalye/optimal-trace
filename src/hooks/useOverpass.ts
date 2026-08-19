@@ -25,6 +25,7 @@ interface UseOverpassResult {
     bbox: Bbox,
     includeRoads: boolean,
     polygon?: [number, number][],
+    includeSidewalks?: boolean,
   ) => void;
   clear: () => void;
   restore: (trails: GeoJSONFeatureCollection) => void;
@@ -37,7 +38,12 @@ export function useOverpass(): UseOverpassResult {
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchFn = useCallback(
-    async (bbox: Bbox, includeRoads: boolean, polygon?: [number, number][]) => {
+    async (
+      bbox: Bbox,
+      includeRoads: boolean,
+      polygon?: [number, number][],
+      includeSidewalks = false,
+    ) => {
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -54,6 +60,7 @@ export function useOverpass(): UseOverpassResult {
           includeRoads,
           controller.signal,
           polygon,
+          includeSidewalks,
         );
         const geojson = osmtogeojson(
           raw,

@@ -155,6 +155,7 @@ function App() {
     null,
   );
   const [includeRoads, setIncludeRoads] = useState(true);
+  const [includeSidewalks, setIncludeSidewalks] = useState(false);
   const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
   const [eraserMode, setEraserMode] = useState<EraserMode>('logical');
   const [savedSelections, setSavedSelections] =
@@ -349,9 +350,14 @@ function App() {
       setGraph(null);
       setStartLat(null);
       setStartLng(null);
-      fetchTrails(bbox, includeRoads, polygonCoords ?? undefined);
+      fetchTrails(
+        bbox,
+        includeRoads,
+        polygonCoords ?? undefined,
+        includeSidewalks,
+      );
     }
-  }, [bbox, includeRoads, polygonCoords, fetchTrails]);
+  }, [bbox, includeRoads, polygonCoords, includeSidewalks, fetchTrails]);
 
   const handleClearTrails = useCallback(() => {
     setRemovedBatches([]);
@@ -369,10 +375,29 @@ function App() {
         setGraph(null);
         setStartLat(null);
         setStartLng(null);
-        fetchTrails(bbox, checked, polygonCoords ?? undefined);
+        fetchTrails(
+          bbox,
+          checked,
+          polygonCoords ?? undefined,
+          includeSidewalks,
+        );
       }
     },
-    [bbox, rawTrails, polygonCoords, fetchTrails],
+    [bbox, rawTrails, polygonCoords, includeSidewalks, fetchTrails],
+  );
+
+  const handleIncludeSidewalksChange = useCallback(
+    (checked: boolean) => {
+      setIncludeSidewalks(checked);
+      if (bbox && rawTrails) {
+        setRemovedBatches([]);
+        setGraph(null);
+        setStartLat(null);
+        setStartLng(null);
+        fetchTrails(bbox, includeRoads, polygonCoords ?? undefined, checked);
+      }
+    },
+    [bbox, rawTrails, polygonCoords, includeRoads, fetchTrails],
   );
 
   const handleFeatureClick = useCallback(
@@ -796,6 +821,17 @@ function App() {
                 onChange={(e) => handleIncludeRoadsChange(e.target.checked)}
               />
               <span>Include roads</span>
+            </label>
+          )}
+
+          {bbox && (
+            <label className="sidebar-checkbox">
+              <input
+                type="checkbox"
+                checked={includeSidewalks}
+                onChange={(e) => handleIncludeSidewalksChange(e.target.checked)}
+              />
+              <span>Include sidewalks</span>
             </label>
           )}
 
