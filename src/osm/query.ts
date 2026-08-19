@@ -23,6 +23,8 @@ const ROAD_TAGS = [
   'residential',
   'unclassified',
   'tertiary',
+  'secondary',
+  'primary',
   'service',
   'living_street',
   'pedestrian',
