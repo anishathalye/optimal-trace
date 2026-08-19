@@ -29,3 +29,11 @@ export interface Graph {
   edges: Edge[];
   adjacency: Map<string, Map<string, number>>;
 }
+
+export interface ManualConnector {
+  id: string;
+  fromKey: string;
+  toKey: string;
+  from: Node;
+  to: Node;
+}

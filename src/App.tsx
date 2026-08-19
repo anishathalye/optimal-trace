@@ -4,12 +4,12 @@ import MapView from './components/MapView';
 import type { Bbox, DrawMode } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
-import { trailDistance, trailCount } from './utils/geo';
+import { trailDistance, trailCount, haversineDistance } from './utils/geo';
 import buildGraph from './graph/build';
 import { graphToFeatures, graphToPhysicalFeatures } from './graph/features';
 import { pruneGraph } from './graph/prune';
-import type { Graph } from './graph/types';
-import { pointKey } from './graph/types';
+import type { Graph, ManualConnector } from './graph/types';
+import { pointKey, edgeIdKey } from './graph/types';
 import {
   connectedComponents,
   oddDegreeNodes,
@@ -36,6 +36,7 @@ import {
   removeLogicalEdge,
   removeEdgeById,
   buildGraphWithRemovals,
+  addManualEdges,
 } from './graph/mutate';
 
 const VIEW_KEY = 'optimal-trace-view';
@@ -162,6 +163,9 @@ function App() {
     useState<Record<string, SavedSelection>>(loadSavedSelections);
   const [saveName, setSaveName] = useState('');
   const [erasing, setErasing] = useState(false);
+  const [addingTrail, setAddingTrail] = useState(false);
+  const [addedTrails, setAddedTrails] = useState<ManualConnector[]>([]);
+  const addedTrailIdRef = useRef(0);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
   const [selectingStart, setSelectingStart] = useState(false);
@@ -242,10 +246,15 @@ function App() {
       ? pointKey(startLat, startLng)
       : undefined;
 
-  const logicalGraph = useMemo(() => {
+  const baseLogicalGraph = useMemo(() => {
     if (!graph) return null;
     return pruneGraph(graph, startKey);
   }, [graph, startKey]);
+
+  const logicalGraph = useMemo(() => {
+    if (!graph) return null;
+    return pruneGraph(addManualEdges(graph, addedTrails), startKey);
+  }, [graph, addedTrails, startKey]);
 
   const startNodeId = useMemo(() => {
     if (!logicalGraph || startKey == null) return null;
@@ -258,9 +267,9 @@ function App() {
   }, [rawTrails]);
 
   const displayTrails = useMemo(() => {
-    if (logicalGraph) return graphToFeatures(logicalGraph);
+    if (baseLogicalGraph) return graphToFeatures(baseLogicalGraph);
     return rawTrails;
-  }, [logicalGraph, rawTrails]);
+  }, [baseLogicalGraph, rawTrails]);
 
   const eraserTrails = useMemo(() => {
     if (eraserMode === 'physical' && graph) {
@@ -295,7 +304,7 @@ function App() {
 
   const graphStats = useMemo(() => {
     if (!graph) return null;
-    const logical = pruneGraph(graph);
+    const logical = pruneGraph(addManualEdges(graph, addedTrails));
     const components = connectedComponents(logical);
     const odd = oddDegreeNodes(logical);
     const dist = totalEdgeDistance(logical);
@@ -308,7 +317,7 @@ function App() {
       components: components.length,
       distance: dist,
     };
-  }, [graph]);
+  }, [graph, addedTrails]);
 
   const [showDebugGraph, setShowDebugGraph] = useState<
     'raw' | 'logical' | false
@@ -337,6 +346,7 @@ function App() {
     setBbox(null);
     setPolygonCoords(null);
     setRemovedBatches([]);
+    setAddedTrails([]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
@@ -347,6 +357,7 @@ function App() {
   const handleFetchTrails = useCallback(() => {
     if (bbox) {
       setRemovedBatches([]);
+      setAddedTrails([]);
       setGraph(null);
       setStartLat(null);
       setStartLng(null);
@@ -361,6 +372,7 @@ function App() {
 
   const handleClearTrails = useCallback(() => {
     setRemovedBatches([]);
+    setAddedTrails([]);
     setGraph(null);
     setStartLat(null);
     setStartLng(null);
@@ -372,6 +384,7 @@ function App() {
       setIncludeRoads(checked);
       if (bbox && rawTrails) {
         setRemovedBatches([]);
+        setAddedTrails([]);
         setGraph(null);
         setStartLat(null);
         setStartLng(null);
@@ -391,6 +404,7 @@ function App() {
       setIncludeSidewalks(checked);
       if (bbox && rawTrails) {
         setRemovedBatches([]);
+        setAddedTrails([]);
         setGraph(null);
         setStartLat(null);
         setStartLng(null);
@@ -403,12 +417,12 @@ function App() {
   const handleFeatureClick = useCallback(
     (featureId: string) => {
       if (!graph) return;
-      const newGraph = removeLogicalEdge(graph, logicalGraph, featureId);
+      const newGraph = removeLogicalEdge(graph, baseLogicalGraph, featureId);
       setGraph(newGraph);
       setRemovedBatches((prev) => [...prev, new Set([featureId])]);
       setCppResult(null);
     },
-    [graph, logicalGraph],
+    [graph, baseLogicalGraph],
   );
 
   const handleRestoreRemoved = useCallback(() => {
@@ -447,6 +461,7 @@ function App() {
 
       setRemovedBatches(entry.removedBatches.map((ids) => new Set(ids)));
       restoreTrails(entry.trails);
+      setAddedTrails([]);
       setStartLat(null);
       setStartLng(null);
       setCppResult(null);
@@ -458,6 +473,7 @@ function App() {
       setPreviewing(false);
       setSelectingStart(false);
       setErasing(false);
+      setAddingTrail(false);
     },
     [savedSelections, restoreTrails],
   );
@@ -512,10 +528,60 @@ function App() {
         setStartLat(null);
         setStartLng(null);
         setCppResult(null);
+        setAddingTrail(false);
+        setErasing(false);
         return true;
       }
       return false;
     });
+  }, []);
+
+  const handleToggleAddTrail = useCallback(() => {
+    setAddingTrail((prev) => {
+      if (!prev) {
+        setSelectingStart(false);
+        setErasing(false);
+        setCppResult(null);
+        return true;
+      }
+      return false;
+    });
+  }, []);
+
+  const handleAddTrail = useCallback(
+    (fromKey: string, toKey: string) => {
+      if (!graph || fromKey === toKey) return;
+
+      const from = graph.nodes.get(fromKey);
+      const to = graph.nodes.get(toKey);
+      if (!from || !to) return;
+
+      const key = edgeIdKey(fromKey, toKey);
+      if (graph.edges.some((e) => edgeIdKey(e.from, e.to) === key)) return;
+      if (addedTrails.some((t) => edgeIdKey(t.fromKey, t.toKey) === key))
+        return;
+
+      const connector: ManualConnector = {
+        id: `manual-${++addedTrailIdRef.current}`,
+        fromKey,
+        toKey,
+        from: { lat: from.lat, lng: from.lng },
+        to: { lat: to.lat, lng: to.lng },
+      };
+      setAddedTrails((prev) => [...prev, connector]);
+      setCppResult(null);
+    },
+    [graph, addedTrails],
+  );
+
+  const handleRemoveAddedTrail = useCallback((id: string) => {
+    setAddedTrails((prev) => prev.filter((t) => t.id !== id));
+    setCppResult(null);
+  }, []);
+
+  const handleClearAddedTrails = useCallback(() => {
+    setAddedTrails([]);
+    setCppResult(null);
   }, []);
 
   const handleStartNodeSelected = useCallback((lat: number, lng: number) => {
@@ -740,11 +806,15 @@ function App() {
             trails={displayTrails}
             eraserTrails={eraserTrails}
             graph={debugGraph}
+            rawGraph={graph}
             logicalGraph={logicalGraph}
             showDebug={showDebugGraph !== false}
             startNodeId={startNodeId}
             selectingStart={selectingStart}
             erasing={erasing}
+            addingTrail={addingTrail}
+            addedTrails={addedTrails}
+            onAddTrail={handleAddTrail}
             routeSegments={cppResult?.segments ?? null}
             routeCoords={cppResult?.coords ?? null}
             previewing={previewing}
@@ -875,10 +945,25 @@ function App() {
                 <button
                   className={`btn btn-secondary ${erasing ? 'btn-danger' : ''}`}
                   onClick={() => {
-                    setErasing((prev) => !prev);
+                    setErasing((prev) => {
+                      if (!prev) {
+                        setAddingTrail(false);
+                        setSelectingStart(false);
+                        return true;
+                      }
+                      return false;
+                    });
                   }}
                 >
                   {erasing ? 'Erasing\u2026 click to stop' : 'Erase'}
+                </button>
+                <button
+                  className={`btn btn-secondary ${addingTrail ? 'btn-active' : ''}`}
+                  onClick={handleToggleAddTrail}
+                >
+                  {addingTrail
+                    ? 'Adding trail\u2026 click two nodes'
+                    : 'Add Trail'}
                 </button>
                 <label className="sidebar-slider">
                   <span>Erase mode</span>
@@ -908,12 +993,60 @@ function App() {
                   </button>
                 )}
               </div>
+
+              {addedTrails.length > 0 && (
+                <div className="sidebar-section">
+                  <h3>Added trails</h3>
+                  <ul className="selection-list">
+                    {addedTrails.map((trail) => (
+                      <li key={trail.id} className="selection-item">
+                        <div className="selection-info">
+                          <span className="selection-name">
+                            {trail.from.lat.toFixed(5)},{' '}
+                            {trail.from.lng.toFixed(5)} →{' '}
+                            {trail.to.lat.toFixed(5)}, {trail.to.lng.toFixed(5)}
+                          </span>
+                          <span className="selection-meta">
+                            {formatDistance(
+                              haversineDistance(
+                                trail.from.lat,
+                                trail.from.lng,
+                                trail.to.lat,
+                                trail.to.lng,
+                              ),
+                            )}
+                          </span>
+                        </div>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleRemoveAddedTrail(trail.id)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleClearAddedTrails}
+                  >
+                    Clear added trails
+                  </button>
+                </div>
+              )}
             </>
           )}
 
-          {trails && !erasing && (
+          {trails && !erasing && !addingTrail && (
             <p className="sidebar-hint">
               Click a trail segment on the map to remove it.
+            </p>
+          )}
+
+          {trails && addingTrail && (
+            <p className="sidebar-hint">
+              Click a start node, then an end node, to add a trail segment
+              between them.
             </p>
           )}
 

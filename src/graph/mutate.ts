@@ -1,8 +1,9 @@
-import { type Graph } from './types';
+import { type Graph, type ManualConnector } from './types';
 import { PHYSICAL_EDGE_PREFIX, edgeIdKey } from './types';
 import type { GeoJSONFeature } from '../hooks/useOverpass';
 import buildGraph from './build';
 import { pruneGraph } from './prune';
+import { haversineDistance } from '../utils/geo';
 
 function rebuildGraph(graph: Graph, newEdges: typeof graph.edges): Graph {
   const nodes = new Map(graph.nodes);
@@ -84,4 +85,45 @@ export function removeLogicalEdge(
   if (newEdges.length === rawGraph.edges.length) return rawGraph;
 
   return rebuildGraph(rawGraph, newEdges);
+}
+
+export function addManualEdge(graph: Graph, connector: ManualConnector): Graph {
+  const { fromKey, toKey, from, to } = connector;
+
+  if (fromKey === toKey) return graph;
+
+  const key = edgeIdKey(fromKey, toKey);
+  if (graph.edges.some((e) => edgeIdKey(e.from, e.to) === key)) return graph;
+
+  const weight = haversineDistance(from.lat, from.lng, to.lat, to.lng);
+  if (weight < 0.1) return graph;
+
+  const coords: [number, number][] = [
+    [from.lng, from.lat],
+    [to.lng, to.lat],
+  ];
+
+  const nodes = new Map(graph.nodes);
+  if (!nodes.has(fromKey)) nodes.set(fromKey, { lat: from.lat, lng: from.lng });
+  if (!nodes.has(toKey)) nodes.set(toKey, { lat: to.lat, lng: to.lng });
+
+  const newEdges = [
+    ...graph.edges,
+    { from: fromKey, to: toKey, weight, coords },
+  ];
+  return rebuildGraph(
+    { nodes, edges: graph.edges, adjacency: graph.adjacency },
+    newEdges,
+  );
+}
+
+export function addManualEdges(
+  graph: Graph,
+  connectors: ManualConnector[],
+): Graph {
+  let result = graph;
+  for (const connector of connectors) {
+    result = addManualEdge(result, connector);
+  }
+  return result;
 }

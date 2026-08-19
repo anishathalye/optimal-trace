@@ -5,6 +5,7 @@ import {
   useMap,
   Marker,
   CircleMarker,
+  Polyline,
   useMapEvents,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -17,11 +18,12 @@ import DrawControl, { type Bbox, type DrawMode } from './DrawControl';
 import TrailLayer from './TrailLayer';
 import GraphDebugLayer from './GraphDebugLayer';
 import EraserTool from './EraserTool';
+import AddTrailTool from './AddTrailTool';
 import RouteLayer from './RouteLayer';
 import PreviewLayer from './PreviewLayer';
 import type { RouteSegment } from '../solver/cpp';
 import type { GeoJSONFeatureCollection } from '../hooks/useOverpass';
-import type { Graph } from '../graph/types';
+import type { Graph, ManualConnector } from '../graph/types';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)
   ._getIconUrl;
@@ -171,11 +173,15 @@ interface MapViewProps {
   trails: GeoJSONFeatureCollection | null;
   eraserTrails: GeoJSONFeatureCollection | null;
   graph: Graph | null;
+  rawGraph: Graph | null;
   logicalGraph: Graph | null;
   showDebug: boolean;
   startNodeId: string | null;
   selectingStart: boolean;
   erasing: boolean;
+  addingTrail: boolean;
+  addedTrails: ManualConnector[];
+  onAddTrail: (fromKey: string, toKey: string) => void;
   routeSegments: RouteSegment[] | null;
   routeCoords: [number, number][] | null;
   previewing: boolean;
@@ -199,11 +205,15 @@ function MapView({
   trails,
   eraserTrails,
   graph,
+  rawGraph,
   logicalGraph,
   showDebug,
   startNodeId,
   selectingStart,
   erasing,
+  addingTrail,
+  addedTrails,
+  onAddTrail,
   routeSegments,
   routeCoords,
   previewing,
@@ -217,7 +227,8 @@ function MapView({
   center,
   zoom,
 }: MapViewProps) {
-  const cursor = selectingStart ? 'crosshair' : drawing ? 'crosshair' : '';
+  const cursor =
+    selectingStart || addingTrail ? 'crosshair' : drawing ? 'crosshair' : '';
 
   const startNode =
     startNodeId && logicalGraph ? logicalGraph.nodes.get(startNodeId) : null;
@@ -248,7 +259,7 @@ function MapView({
         <TrailLayer
           trails={trails}
           onFeatureClick={onFeatureClick}
-          disableClicks={selectingStart || erasing}
+          disableClicks={selectingStart || erasing || addingTrail}
         />
       )}
       {trails && (
@@ -259,6 +270,22 @@ function MapView({
           onEraseFeature={onEraseFeature}
         />
       )}
+      {addedTrails.map((trail) => (
+        <Polyline
+          key={trail.id}
+          positions={[
+            [trail.from.lat, trail.from.lng],
+            [trail.to.lat, trail.to.lng],
+          ]}
+          pathOptions={{
+            color: '#16a34a',
+            weight: 3,
+            dashArray: '6 4',
+            opacity: 0.9,
+          }}
+        />
+      ))}
+      <AddTrailTool active={addingTrail} graph={rawGraph} onAdd={onAddTrail} />
       {routeSegments && !previewing && <RouteLayer segments={routeSegments} />}
       {routeSegments && routeCoords && (
         <PreviewLayer
