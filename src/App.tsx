@@ -53,6 +53,7 @@ interface CachedView {
 interface SavedSelection {
   trails: GeoJSONFeatureCollection;
   removedBatches: string[][];
+  addedTrails: ManualConnector[];
   savedAt: number;
 }
 
@@ -441,13 +442,14 @@ function App() {
     const entry: SavedSelection = {
       trails: rawTrails,
       removedBatches: removedBatches.map((batch) => Array.from(batch)),
+      addedTrails,
       savedAt: Date.now(),
     };
     const next = { ...savedSelections, [name]: entry };
     setSavedSelections(next);
     persistSavedSelections(next);
     setSaveName('');
-  }, [rawTrails, removedBatches, savedSelections, saveName]);
+  }, [rawTrails, removedBatches, addedTrails, savedSelections, saveName]);
 
   const handleLoadSelection = useCallback(
     (name: string) => {
@@ -461,7 +463,7 @@ function App() {
 
       setRemovedBatches(entry.removedBatches.map((ids) => new Set(ids)));
       restoreTrails(entry.trails);
-      setAddedTrails([]);
+      setAddedTrails(entry.addedTrails ?? []);
       setStartLat(null);
       setStartLng(null);
       setCppResult(null);
