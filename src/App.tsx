@@ -158,7 +158,7 @@ function App() {
   );
   const [includeRoads, setIncludeRoads] = useState(true);
   const [includeSidewalks, setIncludeSidewalks] = useState(false);
-  const [removedBatches, setRemovedBatches] = useState<Set<string>[]>([]);
+  const [removedBatches, setRemovedBatches] = useState<string[][]>([]);
   const [eraserMode, setEraserMode] = useState<EraserMode>('logical');
   const [savedSelections, setSavedSelections] =
     useState<Record<string, SavedSelection>>(loadSavedSelections);
@@ -249,8 +249,8 @@ function App() {
 
   const baseLogicalGraph = useMemo(() => {
     if (!graph) return null;
-    return pruneGraph(graph, startKey);
-  }, [graph, startKey]);
+    return pruneGraph(graph);
+  }, [graph]);
 
   const logicalGraph = useMemo(() => {
     if (!graph) return null;
@@ -289,9 +289,9 @@ function App() {
     setBuildingGraph(true);
     setTimeout(() => {
       try {
-        const allRemoved = new Set<string>();
+        const allRemoved: string[] = [];
         for (const batch of removedBatchesRef.current) {
-          for (const id of batch) allRemoved.add(id);
+          for (const id of batch) allRemoved.push(id);
         }
         const g = buildGraphWithRemovals(rawTrails.features, allRemoved);
         setGraph(g);
@@ -420,7 +420,7 @@ function App() {
       if (!graph) return;
       const newGraph = removeLogicalEdge(graph, baseLogicalGraph, featureId);
       setGraph(newGraph);
-      setRemovedBatches((prev) => [...prev, new Set([featureId])]);
+      setRemovedBatches((prev) => [...prev, [featureId]]);
       setCppResult(null);
     },
     [graph, baseLogicalGraph],
@@ -441,7 +441,7 @@ function App() {
 
     const entry: SavedSelection = {
       trails: rawTrails,
-      removedBatches: removedBatches.map((batch) => Array.from(batch)),
+      removedBatches: removedBatches.map((batch) => [...batch]),
       addedTrails,
       savedAt: Date.now(),
     };
@@ -461,7 +461,7 @@ function App() {
         elevationAbortRef.current = null;
       }
 
-      setRemovedBatches(entry.removedBatches.map((ids) => new Set(ids)));
+      setRemovedBatches(entry.removedBatches.map((ids) => [...ids]));
       restoreTrails(entry.trails);
       setAddedTrails(entry.addedTrails ?? []);
       setStartLat(null);
@@ -494,9 +494,9 @@ function App() {
     if (!rawTrails) return;
     setRemovedBatches((prev) => {
       const next = prev.slice(0, -1);
-      const allRemaining = new Set<string>();
+      const allRemaining: string[] = [];
       for (const batch of next) {
-        for (const id of batch) allRemaining.add(id);
+        for (const id of batch) allRemaining.push(id);
       }
       setGraph(buildGraphWithRemovals(rawTrails.features, allRemaining));
       return next;
@@ -504,15 +504,15 @@ function App() {
   }, [rawTrails]);
 
   const handleEraseStart = useCallback(() => {
-    setRemovedBatches((prev) => [...prev, new Set<string>()]);
+    setRemovedBatches((prev) => [...prev, []]);
   }, []);
 
   const handleEraseFeature = useCallback((featureId: string) => {
     setRemovedBatches((prev) => {
       const copy = [...prev];
-      if (copy.length === 0) copy.push(new Set<string>());
-      const last = new Set(copy[copy.length - 1]);
-      last.add(featureId);
+      if (copy.length === 0) copy.push([]);
+      const last = [...copy[copy.length - 1]];
+      last.push(featureId);
       copy[copy.length - 1] = last;
       return copy;
     });

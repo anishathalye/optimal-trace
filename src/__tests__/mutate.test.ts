@@ -142,6 +142,95 @@ describe('buildGraphWithRemovals', () => {
     const result = buildGraphWithRemovals(features, [id]);
     expect(result.edges.length).toBe(0);
   });
+
+  it('removal ids from the unpreserved logical graph survive a rebuild', () => {
+    // A degree-2 middle node merges into a single logical edge. The id used
+    // for removal must come from pruneGraph without a preserved start node,
+    // because save/load rebuilds the graph without a start point.
+    const features = [
+      makeFeature([
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ]),
+      makeFeature([
+        [5, 0],
+        [5.0001, 0],
+        [5.0002, 0],
+      ]),
+    ];
+    const base = buildGraph(features);
+    const logical = pruneGraph(base);
+    const id = edgeKey(pointKey(0, 0), pointKey(0, 2));
+
+    expect(logical.edges.map((e) => edgeKey(e.from, e.to))).toContain(id);
+
+    const result = buildGraphWithRemovals(features, [id]);
+    expect(result.edges.some((e) => edgeKey(e.from, e.to) === id)).toBe(false);
+    // the other (tiny) component is untouched
+    expect(result.edges.some((e) => e.coords.some(([lng]) => lng > 4))).toBe(
+      true,
+    );
+  });
+
+  it('a stale preserved id from an old save is a harmless no-op', () => {
+    // chain A(0,0)-B(1,0)-C(2,0); old buggy saves used the preserved id "A|B"
+    // (start point at degree-2 B), which no longer matches on rebuild. It must
+    // not resurrect the segment once the corrected id "A|C" is also stored.
+    const features = [
+      makeFeature([
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ]),
+    ];
+    const staleId = edgeKey(pointKey(0, 0), pointKey(0, 1)); // A|B
+    const correctedId = edgeKey(pointKey(0, 0), pointKey(0, 2)); // A|C
+
+    const staleOnly = buildGraphWithRemovals(features, [staleId]);
+    expect(staleOnly.edges.length).toBe(2);
+
+    const fixed = buildGraphWithRemovals(features, [staleId, correctedId]);
+    expect(fixed.edges.length).toBe(0);
+  });
+
+  it('duplicate ids must not be deduplicated across batches', () => {
+    // A square cycle collapses to a triangle. Removing the direct edge between
+    // two corners leaves the other path (through the fourth corner) with the
+    // same logical id. If removals are deduplicated, the second removal is
+    // dropped and a segment comes back.
+    const features = [
+      makeFeature([
+        [0, 0],
+        [0, 2],
+        [2, 2],
+        [2, 0],
+        [0, 0],
+      ]),
+    ];
+    const b = pointKey(2, 0); // lng 0, lat 2
+    const c = pointKey(2, 2); // lng 2, lat 2
+    const d = pointKey(0, 2); // lng 2, lat 0
+    const idCD = edgeKey(c, d);
+
+    const connected = (
+      g: ReturnType<typeof buildGraph>,
+      x: string,
+      y: string,
+    ) =>
+      connectedComponents(g).some(
+        (comp) => comp.includes(x) && comp.includes(y),
+      );
+
+    // deduplicating (a Set) leaves the alternate path a-c-d connected to b-c
+    const deduped = buildGraphWithRemovals(features, new Set([idCD]));
+    expect(connected(deduped, b, c)).toBe(true);
+
+    // preserving both occurrences removes the whole square
+    const preserved = buildGraphWithRemovals(features, [idCD, idCD]);
+    expect(connected(preserved, b, c)).toBe(false);
+    expect(preserved.edges.length).toBe(0);
+  });
 });
 
 describe('removeRawEdge', () => {
