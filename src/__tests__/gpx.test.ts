@@ -9,7 +9,10 @@ import {
 
 const MILE = METERS_PER_MILE;
 
-function lineCoords(numPoints: number, metersPerStep: number): [number, number][] {
+function lineCoords(
+  numPoints: number,
+  metersPerStep: number,
+): [number, number][] {
   const degPerMeter = 1 / 111195;
   return Array.from(
     { length: numPoints },

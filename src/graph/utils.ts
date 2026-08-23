@@ -33,13 +33,39 @@ export function connectedComponents(graph: Graph): string[][] {
 }
 
 export function oddDegreeNodes(graph: Graph): string[] {
+  // Count true edge degree (parallel edges each count), not unique-neighbour
+  // count, so parity is correct for multigraphs.
+  const degree = new Map<string, number>();
+  for (const edge of graph.edges) {
+    degree.set(edge.from, (degree.get(edge.from) ?? 0) + 1);
+    degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
+  }
+
   const odd: string[] = [];
-  for (const [nodeId, neighbors] of graph.adjacency) {
-    if (neighbors.size % 2 !== 0) {
+  for (const [nodeId, d] of degree) {
+    if (d % 2 !== 0) {
       odd.push(nodeId);
     }
   }
   return odd;
+}
+
+export function unreachableComponentCount(
+  components: string[][],
+  startNode: string,
+): number {
+  if (components.length <= 1) return 0;
+
+  let reachable = false;
+  let unreachable = 0;
+  for (const component of components) {
+    if (component.includes(startNode)) {
+      reachable = true;
+    } else {
+      unreachable++;
+    }
+  }
+  return reachable ? unreachable : components.length;
 }
 
 export function totalEdgeDistance(graph: Graph): number {

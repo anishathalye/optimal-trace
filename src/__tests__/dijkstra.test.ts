@@ -95,4 +95,51 @@ describe('dijkstra', () => {
     expect(path[0]).toBe(src);
     expect(path[2]).toBe(target);
   });
+
+  it('relaxes an initially-worse tentative distance (decrease-key)', () => {
+    // Handcrafted weights: A-B direct is expensive; A-C-B is cheaper.
+    const A = 'A';
+    const B = 'B';
+    const C = 'C';
+    const g: Graph = {
+      nodes: new Map([
+        [A, { lat: 0, lng: 0 }],
+        [B, { lat: 0, lng: 1 }],
+        [C, { lat: 1, lng: 0.5 }],
+      ]),
+      edges: [
+        { from: A, to: B, weight: 10, coords: [] },
+        { from: A, to: C, weight: 1, coords: [] },
+        { from: C, to: B, weight: 2, coords: [] },
+      ],
+      adjacency: new Map([
+        [
+          A,
+          new Map([
+            [B, 10],
+            [C, 1],
+          ]),
+        ],
+        [
+          B,
+          new Map([
+            [A, 10],
+            [C, 2],
+          ]),
+        ],
+        [
+          C,
+          new Map([
+            [A, 1],
+            [B, 2],
+          ]),
+        ],
+      ]),
+    };
+
+    const { distances, previous } = dijkstra(g, A);
+    expect(distances.get(B)).toBe(3);
+    expect(previous.get(B)).toBe(C);
+    expect(distances.get(C)).toBe(1);
+  });
 });

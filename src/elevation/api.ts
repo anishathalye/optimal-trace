@@ -78,9 +78,21 @@ function coordKey(lat: number, lng: number): string {
 
 export function parseElevationResults(json: unknown): number[] {
   const data = json as {
-    results?: { value?: string }[];
+    results?: { value?: string | null }[];
     value?: string;
+    error?: { message?: string };
   };
+
+  // An ArcGIS error body can arrive with HTTP 200; treat it as a failure so
+  // the caller retries instead of caching garbage (e.g. zeros) permanently.
+  if (data.error) {
+    throw new Error(
+      data.error.message
+        ? `Elevation API error: ${data.error.message}`
+        : 'Elevation API returned an error.',
+    );
+  }
+
   const entries = Array.isArray(data.results) ? data.results : [data];
   return entries.map((entry) => {
     const raw = entry.value;
@@ -150,6 +162,7 @@ export async function fetchElevationForAllCoords(
     return elevations;
   }
 
+  let batchesDone = 0;
   for (let i = 0; i < misses.length; i += BATCH_SIZE) {
     const batch = misses.slice(i, Math.min(i + BATCH_SIZE, misses.length));
     const batchCoords = batch.map((m) => [m.lng, m.lat] as [number, number]);
@@ -160,12 +173,16 @@ export async function fetchElevationForAllCoords(
       elevations[idx] = elevs[j];
       cache.set(coordKey(lat, lng), elevs[j]);
     }
-    persistCache();
+    // Serializing the whole cache is O(size); only do it periodically and
+    // once at the end instead of after every batch.
+    batchesDone++;
+    if (batchesDone % 4 === 0) persistCache();
 
     const resolved = coords.length - misses.length + i + elevs.length;
     onProgress?.(resolved, coords.length);
   }
 
+  persistCache();
   onProgress?.(coords.length, coords.length);
   return elevations;
 }

@@ -1,5 +1,9 @@
 import type { Graph, Edge } from '../graph/types';
-import { oddDegreeNodes, connectedComponents } from '../graph/utils';
+import {
+  oddDegreeNodes,
+  connectedComponents,
+  unreachableComponentCount,
+} from '../graph/utils';
 import { dijkstra, reconstructPath } from './dijkstra';
 import blossom from './blossom';
 import {
@@ -209,6 +213,34 @@ function pairKey(u: string, v: string): string {
   return u < v ? `${u}|${v}` : `${v}|${u}`;
 }
 
+export function disconnectedWarning(
+  components: string[][],
+  startNode: string,
+): string | null {
+  const unreachable = unreachableComponentCount(components, startNode);
+  if (unreachable === 0) return null;
+  return `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
+}
+
+export function circuitDistances(
+  edgeIndex: Map<string, Map<string, Edge>>,
+  circuit: string[],
+): { totalDistance: number; uniqueDistance: number } {
+  let totalDistance = 0;
+  const seen = new Map<string, number>();
+  for (let i = 0; i < circuit.length - 1; i++) {
+    const u = circuit[i];
+    const v = circuit[i + 1];
+    const edge = edgeIndex.get(u)?.get(v);
+    if (!edge) continue;
+    totalDistance += edge.weight;
+    seen.set(pairKey(u, v), edge.weight);
+  }
+  let uniqueDistance = 0;
+  for (const weight of seen.values()) uniqueDistance += weight;
+  return { totalDistance, uniqueDistance };
+}
+
 function buildCostMap(
   graph: Graph,
   mode: SymmetricMode,
@@ -221,18 +253,6 @@ function buildCostMap(
     map.set(pairKey(edge.from, edge.to), edgeWeight(edge, mode, elevationOf));
   }
   return map;
-}
-
-function pathMeters(
-  edgeIndex: Map<string, Map<string, Edge>>,
-  path: string[],
-): number {
-  let meters = 0;
-  for (let i = 0; i < path.length - 1; i++) {
-    const edge = edgeIndex.get(path[i])?.get(path[i + 1]);
-    if (edge) meters += edge.weight;
-  }
-  return meters;
 }
 
 export function buildRouteCoords(
@@ -301,11 +321,7 @@ export function solveCPP(
   const elevationOf = options.elevationOf;
 
   const components = connectedComponents(graph);
-  let warning: string | null = null;
-  if (components.length > 1) {
-    const unreachable = components.length - 1;
-    warning = `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
-  }
+  const warning = disconnectedWarning(components, startNode);
 
   const oddNodes = oddDegreeNodes(graph);
 
@@ -335,19 +351,13 @@ export function solveCPP(
 
   const { coords, segments } = buildRouteCoords(graph, circuit);
 
-  let totalDistance = 0;
-  for (const edge of graph.edges) {
-    totalDistance += edge.weight;
-  }
-  for (const [u, v] of matching) {
-    const info = allPairs.get(u)?.get(v);
-    if (info) totalDistance += pathMeters(edgeIndex, info.path);
-  }
-
-  let uniqueDistance = 0;
-  for (const edge of graph.edges) {
-    uniqueDistance += edge.weight;
-  }
+  // Stats reflect the route actually traversed. In disconnected graphs the
+  // circuit only covers the start's component; summing all graph edges here
+  // would overstate both totals.
+  const { totalDistance, uniqueDistance } = circuitDistances(
+    edgeIndex,
+    circuit,
+  );
 
   const result: CPPResult = {
     circuit,

@@ -48,6 +48,21 @@ function EraserTool({
     }
   }, [map, active]);
 
+  // mouseup outside the map never reaches the map handler; listen on the
+  // window so erasing does not stay stuck "on" after releasing elsewhere.
+  useEffect(() => {
+    if (!active) return;
+    const stop = () => {
+      erasing.current = false;
+    };
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('blur', stop);
+    return () => {
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('blur', stop);
+    };
+  }, [active]);
+
   const eraseAt = useCallback(
     (latlng: L.LatLng) => {
       if (!trails) return;
@@ -87,9 +102,6 @@ function EraserTool({
       if (active) setMouseLatlng(e.latlng);
       if (!active || !erasing.current) return;
       eraseAt(e.latlng);
-    },
-    mouseup() {
-      erasing.current = false;
     },
   });
 

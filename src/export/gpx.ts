@@ -104,7 +104,9 @@ export function downloadGPXFiles(gpxs: string[], baseFilename: string) {
   const base = baseFilename.replace(/\.gpx$/i, '');
   gpxs.forEach((gpx, i) => {
     const filename =
-      gpxs.length > 1 ? `${base}-${i + 1}-of-${gpxs.length}.gpx` : `${base}.gpx`;
+      gpxs.length > 1
+        ? `${base}-${i + 1}-of-${gpxs.length}.gpx`
+        : `${base}.gpx`;
     setTimeout(() => downloadGPX(gpx, filename), i * 300);
   });
 }

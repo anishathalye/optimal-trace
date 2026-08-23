@@ -57,13 +57,15 @@ function bboxesOverlap(
   );
 }
 
+export interface IntersectionGroup {
+  point: Point;
+  segs: number[];
+}
+
 export function findAllIntersections(
   segments: RawSegment[],
-): Map<string, { point: Point; segA: number; segB: number }> {
-  const intersections = new Map<
-    string,
-    { point: Point; segA: number; segB: number }
-  >();
+): Map<string, IntersectionGroup> {
+  const intersections = new Map<string, IntersectionGroup>();
 
   const boxes = segments.map((s) => bbox(s.a, s.b));
 
@@ -79,9 +81,15 @@ export function findAllIntersections(
       );
       if (!pt) continue;
 
+      // Every segment passing through this point must be registered so each
+      // one gets split here (multi-way crossings).
       const key = pointKey(pt[1], pt[0]);
-      if (!intersections.has(key)) {
-        intersections.set(key, { point: pt, segA: i, segB: j });
+      const group = intersections.get(key);
+      if (group) {
+        if (!group.segs.includes(i)) group.segs.push(i);
+        if (!group.segs.includes(j)) group.segs.push(j);
+      } else {
+        intersections.set(key, { point: pt, segs: [i, j] });
       }
     }
   }

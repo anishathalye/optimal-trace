@@ -1,6 +1,12 @@
 import type { Graph, Edge } from '../graph/types';
 import { connectedComponents } from '../graph/utils';
-import { buildEdgeIndex, buildRouteCoords, type CPPResult } from './cpp';
+import {
+  buildEdgeIndex,
+  buildRouteCoords,
+  circuitDistances,
+  disconnectedWarning,
+  type CPPResult,
+} from './cpp';
 import { directedEdgeCosts, routeMetrics, type ElevationLookup } from './costs';
 
 const GLP_MIN = 1;
@@ -176,17 +182,13 @@ export function buildRouteFromTraversals(
   const circuit = directedEulerCircuit(adjacency, start);
   const { coords, segments } = buildRouteCoords(graph, circuit);
 
+  // Distance stats reflect the route actually traversed so that "retraced"
+  // never goes negative when unreachable components exist.
   const edgeIndex = buildEdgeIndex(graph);
-  let totalDistance = 0;
-  for (let i = 0; i < circuit.length - 1; i++) {
-    const edge = edgeIndex.get(circuit[i])?.get(circuit[i + 1]);
-    if (edge) totalDistance += edge.weight;
-  }
-
-  let uniqueDistance = 0;
-  for (const edge of graph.edges) {
-    uniqueDistance += edge.weight;
-  }
+  const { totalDistance, uniqueDistance } = circuitDistances(
+    edgeIndex,
+    circuit,
+  );
 
   return { circuit, coords, segments, totalDistance, uniqueDistance };
 }
@@ -198,11 +200,7 @@ export async function solveWindyCPP(
   solveLP: ILPSolver,
 ): Promise<CPPResult> {
   const components = connectedComponents(graph);
-  let warning: string | null = null;
-  if (components.length > 1) {
-    const unreachable = components.length - 1;
-    warning = `${unreachable} disconnected component${unreachable > 1 ? 's' : ''} not reachable from start point.`;
-  }
+  const warning = disconnectedWarning(components, startNode);
 
   const { lp, edgeDir } = buildWindyLP(graph, elevationOf);
   const solution = await solveLP(lp);

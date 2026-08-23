@@ -55,6 +55,22 @@ function DrawControl({
     setMouseLatlng(null);
   }, [drawMode, drawing]);
 
+  // If the rectangle drag ends outside the map, no map mouseup fires; cancel
+  // the stale drag so a later mousemove does not keep redrawing the box.
+  useEffect(() => {
+    if (!drawing || drawMode !== 'rectangle') return;
+    const cancelDrag = () => {
+      startRef.current = null;
+      setDraftBounds(null);
+    };
+    window.addEventListener('mouseup', cancelDrag);
+    window.addEventListener('blur', cancelDrag);
+    return () => {
+      window.removeEventListener('mouseup', cancelDrag);
+      window.removeEventListener('blur', cancelDrag);
+    };
+  }, [drawing, drawMode]);
+
   const closePolygon = useCallback(
     (vertices: L.LatLng[]) => {
       const coords = vertices.map((v): [number, number] => [v.lng, v.lat]);

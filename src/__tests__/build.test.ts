@@ -5,6 +5,7 @@ import {
   oddDegreeNodes,
   totalEdgeDistance,
 } from '../graph/utils';
+import type { Graph } from '../graph/types';
 import type { GeoJSONFeature } from '../hooks/useOverpass';
 
 function makeFeature(coords: [number, number][]): GeoJSONFeature {
@@ -112,6 +113,27 @@ describe('buildGraph', () => {
     const components = connectedComponents(graph);
     expect(components.length).toBe(1);
   });
+
+  it('connects all ways of a three-way interior crossing', () => {
+    // Three trails crossing at the exact same interior point (1, 0).
+    const features = [
+      makeFeature([
+        [0, 0],
+        [2, 0],
+      ]),
+      makeFeature([
+        [1, -1],
+        [1, 1],
+      ]),
+      makeFeature([
+        [0.9, -1],
+        [1.1, 1],
+      ]),
+    ];
+    const graph = buildGraph(features);
+    const components = connectedComponents(graph);
+    expect(components.length).toBe(1);
+  });
 });
 
 describe('graph/utils', () => {
@@ -129,6 +151,68 @@ describe('graph/utils', () => {
     const graph = buildGraph(features);
     const odd = oddDegreeNodes(graph);
     expect(odd.length % 2).toBe(0);
+  });
+
+  it('regression: counts parallel edges in degree parity', () => {
+    // Square with one side doubled. True degrees: A=3, B=3, C=2, D=2.
+    const A = 'A';
+    const B = 'B';
+    const C = 'C';
+    const D = 'D';
+    const mkEdge = (from: string, to: string) => ({
+      from,
+      to,
+      weight: 1,
+      coords: [] as [number, number][],
+    });
+    const graph: Graph = {
+      nodes: new Map([
+        [A, { lat: 0, lng: 0 }],
+        [B, { lat: 0, lng: 1 }],
+        [C, { lat: 1, lng: 1 }],
+        [D, { lat: 1, lng: 0 }],
+      ]),
+      edges: [
+        mkEdge(A, B),
+        mkEdge(A, B), // parallel
+        mkEdge(B, C),
+        mkEdge(C, D),
+        mkEdge(D, A),
+      ],
+      adjacency: new Map([
+        [
+          A,
+          new Map([
+            [B, 1],
+            [D, 1],
+          ]),
+        ],
+        [
+          B,
+          new Map([
+            [A, 1],
+            [C, 1],
+          ]),
+        ],
+        [
+          C,
+          new Map([
+            [B, 1],
+            [D, 1],
+          ]),
+        ],
+        [
+          D,
+          new Map([
+            [C, 1],
+            [A, 1],
+          ]),
+        ],
+      ]),
+    };
+
+    const odd = oddDegreeNodes(graph).sort();
+    expect(odd).toEqual([A, B]);
   });
 
   it('totalEdgeDistance is positive for non-empty graph', () => {

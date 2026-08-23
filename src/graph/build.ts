@@ -38,33 +38,18 @@ function buildGraph(features: GeoJSONFeature[]): Graph {
   const segKey = (fi: number, si: number) => fi * 1_000_000 + si;
 
   for (const [, inter] of intersectionMap) {
-    const keyA = segKey(
-      segments[inter.segA].featureIdx,
-      segments[inter.segA].segmentIdx,
-    );
-    const keyB = segKey(
-      segments[inter.segB].featureIdx,
-      segments[inter.segB].segmentIdx,
-    );
-
-    const distA = haversineDistance(
-      segments[inter.segA].a[1],
-      segments[inter.segA].a[0],
-      inter.point[1],
-      inter.point[0],
-    );
-    const distB = haversineDistance(
-      segments[inter.segB].a[1],
-      segments[inter.segB].a[0],
-      inter.point[1],
-      inter.point[0],
-    );
-
-    if (!segIntersections.has(keyA)) segIntersections.set(keyA, []);
-    segIntersections.get(keyA)!.push({ point: inter.point, dist: distA });
-
-    if (!segIntersections.has(keyB)) segIntersections.set(keyB, []);
-    segIntersections.get(keyB)!.push({ point: inter.point, dist: distB });
+    for (const segIdx of inter.segs) {
+      const seg = segments[segIdx];
+      const key = segKey(seg.featureIdx, seg.segmentIdx);
+      const dist = haversineDistance(
+        seg.a[1],
+        seg.a[0],
+        inter.point[1],
+        inter.point[0],
+      );
+      if (!segIntersections.has(key)) segIntersections.set(key, []);
+      segIntersections.get(key)!.push({ point: inter.point, dist });
+    }
   }
 
   const nodes = new Map<string, Node>();

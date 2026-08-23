@@ -73,15 +73,21 @@ export function useOverpass(): UseOverpassResult {
           return true;
         });
 
+        if (abortRef.current !== controller) return;
         setTrails(geojson);
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
+        // A newer request has superseded this one; let it own the state.
+        if (abortRef.current !== controller) return;
         setError(
           err instanceof Error ? err.message : 'Failed to fetch trails.',
         );
       } finally {
-        setLoading(false);
-        abortRef.current = null;
+        // Only reset shared state if this request is still the active one.
+        if (abortRef.current === controller) {
+          setLoading(false);
+          abortRef.current = null;
+        }
       }
     },
     [],

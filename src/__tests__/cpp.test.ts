@@ -197,4 +197,65 @@ describe('solveCPP', () => {
     expect(orange.length).toBeGreaterThan(0);
     expect(result.segments.every((s) => s.coords.length >= 2)).toBe(true);
   });
+
+  it('regression: disconnected stats cover only the reachable component', () => {
+    // Two disjoint Eulerian triangles; the route can only cover the first.
+    const g = makeGraph([
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.001, 0],
+        [0.0005, 0.001],
+      ],
+      [
+        [0.0005, 0.001],
+        [0, 0],
+      ],
+      // second component, far away
+      [
+        [5, 5],
+        [5.001, 5],
+      ],
+      [
+        [5.001, 5],
+        [5.0005, 5.001],
+      ],
+      [
+        [5.0005, 5.001],
+        [5, 5],
+      ],
+    ]);
+    const start = firstNode(g);
+    const result = solveCPP(g, start);
+
+    expect(result.warning).toBe(
+      '1 disconnected component not reachable from start point.',
+    );
+    expect(result.totalDistance).toBeCloseTo(result.uniqueDistance, 6);
+    expect(result.totalDistance).toBeGreaterThan(0);
+
+    const allEdges = g.edges.reduce((sum, e) => sum + e.weight, 0);
+    expect(result.uniqueDistance).toBeLessThan(allEdges * 0.75);
+  });
+
+  it('reports no warning when start sits in the largest component', () => {
+    const g = makeGraph([
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      // unreachable isolated component
+      [
+        [5, 5],
+        [5.001, 5],
+      ],
+    ]);
+    const start = firstNode(g);
+    const result = solveCPP(g, start);
+    expect(result.warning).toBe(
+      '1 disconnected component not reachable from start point.',
+    );
+  });
 });

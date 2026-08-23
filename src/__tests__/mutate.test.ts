@@ -122,6 +122,67 @@ describe('removeLogicalEdge', () => {
     const result = removeLogicalEdge(raw, null, edgeKey(a, b));
     expect(result.edges.length).toBe(1);
   });
+
+  it('regression: keeps chords that share only endpoints with the erased chain', () => {
+    // Raw line A-B-C-D-E plus a shortcut B-D. Erasing a logical chain that
+    // spans A..E must remove the four chain edges but keep the shortcut,
+    // whose endpoints are non-consecutive vertices of the chain.
+    const raw = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+      [
+        [2, 0],
+        [3, 0],
+      ],
+      [
+        [3, 0],
+        [4, 0],
+      ],
+      [
+        [1, 0],
+        [3, 0], // chord B-D
+      ],
+    ]);
+    expect(raw.edges.length).toBe(5);
+
+    // Hand-built logical edge spanning A..E through B, C, D.
+    const fakeLogical: Graph = {
+      nodes: raw.nodes,
+      edges: [
+        {
+          from: pointKey(0, 0),
+          to: pointKey(0, 4),
+          weight: NaN,
+          coords: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+            [3, 0],
+            [4, 0],
+          ],
+        },
+      ],
+      adjacency: new Map(),
+    };
+
+    const result = removeLogicalEdge(
+      raw,
+      fakeLogical,
+      edgeKey(pointKey(0, 0), pointKey(0, 4)),
+    );
+
+    expect(result.edges.length).toBe(1);
+    const remaining = result.edges[0];
+    expect(edgeKey(remaining.from, remaining.to)).toBe(
+      edgeKey(pointKey(0, 1), pointKey(0, 3)),
+    );
+  });
 });
 
 describe('buildGraphWithRemovals', () => {

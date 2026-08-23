@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { pruneGraph } from '../graph/prune';
-import { pointKey } from '../graph/types';
+import { pointKey, type Edge } from '../graph/types';
 import type { Graph } from '../graph/types';
 import { haversineDistance } from '../utils/geo';
 
 function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   const nodes = new Map<string, { lat: number; lng: number }>();
-  const graphEdges: Array<{
-    from: string;
-    to: string;
-    weight: number;
-    coords: [number, number][];
-  }> = [];
+  const graphEdges: Edge[] = [];
   const adjacency = new Map<string, Map<string, number>>();
 
   for (const [[lng1, lat1], [lng2, lat2]] of edges) {
@@ -38,6 +33,20 @@ function makeGraph(edges: Array<[[number, number], [number, number]]>): Graph {
   }
 
   return { nodes, edges: graphEdges, adjacency };
+}
+
+function assertConsistent(graph: Graph) {
+  const nodeIds = new Set(graph.nodes.keys());
+  for (const e of graph.edges) {
+    expect(nodeIds.has(e.from)).toBe(true);
+    expect(nodeIds.has(e.to)).toBe(true);
+  }
+  for (const [id, neighbors] of graph.adjacency) {
+    expect(nodeIds.has(id)).toBe(true);
+    for (const other of neighbors.keys()) {
+      expect(nodeIds.has(other)).toBe(true);
+    }
+  }
 }
 
 describe('pruneGraph', () => {
@@ -230,5 +239,57 @@ describe('pruneGraph', () => {
     const pruned = pruneGraph(g);
     expect(pruned.edges.length).toBe(1);
     expect(pruned.nodes.size).toBe(2);
+  });
+
+  it('regression: does not prune a node with parallel edges (true degree > 2)', () => {
+    // A-B twice + B-C: B's true edge degree is 3, so B must not be merged.
+    // The old adjacency-size degree saw 2 and merged, leaving a dangling
+    // edge that referenced the deleted node.
+    const g = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [0, 0],
+        [1, 0],
+      ], // parallel duplicate
+      [
+        [1, 0],
+        [2, 0],
+      ],
+    ]);
+    const b = pointKey(0, 1); // lat 0, lng 1
+
+    const pruned = pruneGraph(g);
+    expect(pruned.nodes.has(b)).toBe(true);
+    expect(pruned.edges.length).toBe(3);
+    assertConsistent(pruned);
+  });
+
+  it('keeps adjacency min-weight correct after merges near parallels', () => {
+    const g = makeGraph([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 0],
+        [2, 0],
+      ],
+      [
+        [2, 0],
+        [3, 0],
+      ],
+      [
+        [1, 0],
+        [3, 0],
+      ], // shortcut blocks merging of (2,0)
+    ]);
+    const pruned = pruneGraph(g);
+    assertConsistent(pruned);
+    // Node at (lng 2, lat 0) has neighbours (1,0) and (3,0) which are
+    // directly connected by the shortcut, so it must survive.
+    expect(pruned.nodes.has(pointKey(0, 2))).toBe(true);
   });
 });

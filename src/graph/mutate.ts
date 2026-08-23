@@ -70,16 +70,25 @@ export function removeLogicalEdge(
 
   if (!logicalEdge) return rawGraph;
 
-  const coordSet = new Set(
-    logicalEdge.coords.map(
-      ([lng, lat]) => `${lat.toFixed(6)},${lng.toFixed(6)}`,
-    ),
+  // Only remove raw edges that lie along the erased logical edge, i.e. whose
+  // endpoints are CONSECUTIVE vertices of its polyline. Matching any edge
+  // with both endpoints anywhere in the coordinate set would also delete
+  // unrelated chords sharing two junction vertices.
+  const chain = logicalEdge.coords.map(
+    ([lng, lat]) => `${lat.toFixed(6)},${lng.toFixed(6)}`,
   );
+  const removablePairs = new Set<string>();
+  for (let i = 0; i + 1 < chain.length; i++) {
+    removablePairs.add(edgeIdKey(chain[i], chain[i + 1]));
+  }
 
   const newEdges = rawGraph.edges.filter((e) => {
-    const fromKey = `${rawGraph.nodes.get(e.from)!.lat.toFixed(6)},${rawGraph.nodes.get(e.from)!.lng.toFixed(6)}`;
-    const toKey = `${rawGraph.nodes.get(e.to)!.lat.toFixed(6)},${rawGraph.nodes.get(e.to)!.lng.toFixed(6)}`;
-    return !(coordSet.has(fromKey) && coordSet.has(toKey));
+    const fromNode = rawGraph.nodes.get(e.from);
+    const toNode = rawGraph.nodes.get(e.to);
+    if (!fromNode || !toNode) return true;
+    const fromKey = `${fromNode.lat.toFixed(6)},${fromNode.lng.toFixed(6)}`;
+    const toKey = `${toNode.lat.toFixed(6)},${toNode.lng.toFixed(6)}`;
+    return !removablePairs.has(edgeIdKey(fromKey, toKey));
   });
 
   if (newEdges.length === rawGraph.edges.length) return rawGraph;

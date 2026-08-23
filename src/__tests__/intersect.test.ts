@@ -67,4 +67,20 @@ describe('findAllIntersections', () => {
     const result = findAllIntersections(segments);
     expect(result.size).toBeGreaterThanOrEqual(1);
   });
+
+  it('registers every segment of a multi-way crossing', () => {
+    // Three segments all passing through the same interior point (1, 0).
+    const segments: RawSegment[] = [
+      { a: [0, 0], b: [2, 0], featureIdx: 0, segmentIdx: 0 },
+      { a: [1, -1], b: [1, 1], featureIdx: 1, segmentIdx: 0 },
+      { a: [0.9, -1], b: [1.1, 1], featureIdx: 2, segmentIdx: 0 },
+    ];
+    const result = findAllIntersections(segments);
+    expect(result.size).toBe(1);
+    const group = [...result.values()][0];
+    expect(group.segs).toHaveLength(3);
+    expect(group.segs).toContain(0);
+    expect(group.segs).toContain(1);
+    expect(group.segs).toContain(2);
+  });
 });

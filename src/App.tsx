@@ -5,7 +5,6 @@ import type { Bbox, DrawMode } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
 import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
 import { trailDistance, trailCount, haversineDistance } from './utils/geo';
-import buildGraph from './graph/build';
 import { graphToFeatures, graphToPhysicalFeatures } from './graph/features';
 import { pruneGraph } from './graph/prune';
 import type { Graph, ManualConnector } from './graph/types';
@@ -37,12 +36,7 @@ import {
   type ElevationPoint,
 } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
-import {
-  removeLogicalEdge,
-  removeEdgeById,
-  buildGraphWithRemovals,
-  addManualEdges,
-} from './graph/mutate';
+import { addManualEdges, buildGraphWithRemovals } from './graph/mutate';
 
 const VIEW_KEY = 'optimal-trace-view';
 const SAVED_SELECTIONS_KEY = 'optimal-trace-selections';
@@ -286,46 +280,42 @@ function App() {
     return displayTrails;
   }, [eraserMode, graph, displayTrails]);
 
-  const removedBatchesRef = useRef(removedBatches);
-  useEffect(() => {
-    removedBatchesRef.current = removedBatches;
-  }, [removedBatches]);
-
+  // The graph is always derived from (rawTrails, removedBatches) so that
+  // erase/undo/restore stay consistent. Duplicates in the flattened list are
+  // meaningful: buildGraphWithRemovals must replay every occurrence in order.
   useEffect(() => {
     if (!rawTrails) return;
     setBuildingGraph(true);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       try {
         const allRemoved: string[] = [];
-        for (const batch of removedBatchesRef.current) {
+        for (const batch of removedBatches) {
           for (const id of batch) allRemoved.push(id);
         }
-        const g = buildGraphWithRemovals(rawTrails.features, allRemoved);
-        setGraph(g);
+        setGraph(buildGraphWithRemovals(rawTrails.features, allRemoved));
         setCppResult(null);
       } catch (err) {
         console.error('Graph build failed:', err);
       }
       setBuildingGraph(false);
-    }, 0);
-  }, [rawTrails]);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [rawTrails, removedBatches]);
 
   const graphStats = useMemo(() => {
-    if (!graph) return null;
-    const logical = pruneGraph(addManualEdges(graph, addedTrails));
-    const components = connectedComponents(logical);
-    const odd = oddDegreeNodes(logical);
-    const dist = totalEdgeDistance(logical);
+    if (!graph || !logicalGraph) return null;
+    const components = connectedComponents(logicalGraph);
+    const odd = oddDegreeNodes(logicalGraph);
     return {
       rawNodes: graph.nodes.size,
       rawEdges: graph.edges.length,
-      nodes: logical.nodes.size,
-      edges: logical.edges.length,
+      nodes: logicalGraph.nodes.size,
+      edges: logicalGraph.edges.length,
       oddDegree: odd.length,
       components: components.length,
-      distance: dist,
+      distance: totalEdgeDistance(logicalGraph),
     };
-  }, [graph, addedTrails]);
+  }, [graph, logicalGraph]);
 
   const [showDebugGraph, setShowDebugGraph] = useState<
     'raw' | 'logical' | false
@@ -422,24 +412,17 @@ function App() {
     [bbox, rawTrails, polygonCoords, includeRoads, fetchTrails],
   );
 
-  const handleFeatureClick = useCallback(
-    (featureId: string) => {
-      if (!graph) return;
-      const newGraph = removeLogicalEdge(graph, baseLogicalGraph, featureId);
-      setGraph(newGraph);
-      setRemovedBatches((prev) => [...prev, [featureId]]);
-      setCppResult(null);
-    },
-    [graph, baseLogicalGraph],
-  );
+  const handleFeatureClick = useCallback((featureId: string) => {
+    setRemovedBatches((prev) => [...prev, [featureId]]);
+    setCppResult(null);
+  }, []);
 
   const handleRestoreRemoved = useCallback(() => {
-    if (!rawTrails) return;
-    setGraph(buildGraph(rawTrails.features));
     setRemovedBatches([]);
     setStartLat(null);
     setStartLng(null);
-  }, [rawTrails]);
+    setCppResult(null);
+  }, []);
 
   const handleSaveSelection = useCallback(() => {
     if (!rawTrails) return;
@@ -498,17 +481,8 @@ function App() {
   );
 
   const handleUndo = useCallback(() => {
-    if (!rawTrails) return;
-    setRemovedBatches((prev) => {
-      const next = prev.slice(0, -1);
-      const allRemaining: string[] = [];
-      for (const batch of next) {
-        for (const id of batch) allRemaining.push(id);
-      }
-      setGraph(buildGraphWithRemovals(rawTrails.features, allRemaining));
-      return next;
-    });
-  }, [rawTrails]);
+    setRemovedBatches((prev) => prev.slice(0, -1));
+  }, []);
 
   const handleEraseStart = useCallback(() => {
     setRemovedBatches((prev) => [...prev, []]);
@@ -516,17 +490,9 @@ function App() {
 
   const handleEraseFeature = useCallback((featureId: string) => {
     setRemovedBatches((prev) => {
-      const copy = [...prev];
-      if (copy.length === 0) copy.push([]);
-      const last = [...copy[copy.length - 1]];
+      const last = [...(prev[prev.length - 1] ?? [])];
       last.push(featureId);
-      copy[copy.length - 1] = last;
-      return copy;
-    });
-    setGraph((g) => {
-      if (!g) return g;
-      const lg = pruneGraph(g);
-      return removeEdgeById(g, lg, featureId);
+      return [...prev.slice(0, -1), last];
     });
     setCppResult(null);
   }, []);
@@ -671,10 +637,11 @@ function App() {
           );
         }
       } finally {
+        // An aborted run was superseded; the newer run owns these flags.
         if (!controller.signal.aborted) {
           setElevationLoading(false);
+          setSolving(false);
         }
-        setSolving(false);
       }
     })();
   }, [logicalGraph, startNodeId, routeMode]);
@@ -1372,7 +1339,13 @@ function App() {
           }}
         >
           <p className="sidebar-error">{elevationError}</p>
-          <button className="btn btn-secondary" onClick={handleRetryElevation}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              if (cppResult) handleRetryElevation();
+              else handleComputeRoute();
+            }}
+          >
             Retry
           </button>
         </div>

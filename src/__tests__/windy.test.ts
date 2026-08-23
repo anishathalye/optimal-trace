@@ -5,6 +5,7 @@ import {
   solveWindyCPP,
   buildWindyLP,
   traversalsFromSolution,
+  buildRouteFromTraversals,
   type WindyLP,
 } from '../solver/windy';
 import { directedEdgeCosts, type ElevationLookup } from '../solver/costs';
@@ -179,5 +180,36 @@ describe('solveWindyCPP', () => {
     expect(result.estimatedTime).toBeLessThan(
       Math.max(clockwise, counterclockwise),
     );
+  });
+});
+
+describe('buildRouteFromTraversals', () => {
+  it('regression: stats never count unreachable components', () => {
+    // Two disjoint edges; traversals cover only the first component.
+    const graph = makeGraph([
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [10, 10],
+        [10.002, 10], // much longer edge in the other component
+      ],
+    ]);
+    const reachableEdge = graph.edges[0];
+    const traversals = new Map<string, Map<string, number>>([
+      [reachableEdge.from, new Map([[reachableEdge.to, 1]])],
+      [reachableEdge.to, new Map([[reachableEdge.from, 1]])],
+    ]);
+
+    const result = buildRouteFromTraversals(
+      graph,
+      reachableEdge.from,
+      traversals,
+    );
+
+    expect(result.totalDistance).toBeCloseTo(reachableEdge.weight * 2, 6);
+    expect(result.uniqueDistance).toBeCloseTo(reachableEdge.weight, 6);
+    expect(result.uniqueDistance).toBeLessThanOrEqual(result.totalDistance);
   });
 });

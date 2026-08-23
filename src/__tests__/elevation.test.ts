@@ -26,4 +26,13 @@ describe('parseElevationResults', () => {
   it('rejects non-numeric values as zero', () => {
     expect(parseElevationResults({ value: 'not-a-number' })).toEqual([0]);
   });
+
+  it('throws on an ArcGIS error body so failures are not cached', () => {
+    expect(() =>
+      parseElevationResults({
+        error: { code: 500, message: 'Internal server error' },
+      }),
+    ).toThrow(/Internal server error/);
+    expect(() => parseElevationResults({ error: {} })).toThrow(/Elevation API/);
+  });
 });
