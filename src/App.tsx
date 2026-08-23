@@ -24,7 +24,12 @@ import {
 } from './solver/costs';
 import { solveWindyCPP } from './solver/windy';
 import { solveLP } from './solver/glpk';
-import { generateGPX, downloadGPX } from './export/gpx';
+import {
+  generateGPX,
+  downloadGPX,
+  generateSplitGPX,
+  downloadGPXFiles,
+} from './export/gpx';
 import {
   fetchElevationForAllCoords,
   fetchElevationForGraph,
@@ -188,6 +193,8 @@ function App() {
   const [fullElevations, setFullElevations] = useState<number[] | null>(null);
   const elevationAbortRef = useRef<AbortController | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [splitting, setSplitting] = useState(false);
+  const [splitMaxDistanceMiles, setSplitMaxDistanceMiles] = useState(4);
   const [hoverPoint, setHoverPoint] = useState<{
     lat: number;
     lng: number;
@@ -760,6 +767,25 @@ function App() {
     setExporting(false);
   }, [cppResult, fullElevations]);
 
+  const handleExportSplitGPX = useCallback(async () => {
+    if (!cppResult) return;
+    setSplitting(true);
+    try {
+      const elevations =
+        fullElevations ?? (await fetchElevationForAllCoords(cppResult.coords));
+      const gpxs = generateSplitGPX(
+        cppResult.coords,
+        'Optimal Trace Route',
+        splitMaxDistanceMiles,
+        elevations,
+      );
+      downloadGPXFiles(gpxs, 'optimal-trace-route.gpx');
+    } catch (err) {
+      console.error('Split GPX export failed:', err);
+    }
+    setSplitting(false);
+  }, [cppResult, fullElevations, splitMaxDistanceMiles]);
+
   const handleStartPreview = useCallback(() => {
     setPreviewing(true);
   }, []);
@@ -1251,6 +1277,32 @@ function App() {
                       disabled={exporting}
                     >
                       {exporting ? 'Exporting\u2026' : 'Download GPX'}
+                    </button>
+                    <label className="sidebar-slider">
+                      <span>Max distance per file (miles)</span>
+                      <div className="slider-row">
+                        <input
+                          className="slider-input"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={splitMaxDistanceMiles}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (Number.isFinite(v) && v > 0) {
+                              setSplitMaxDistanceMiles(v);
+                            }
+                          }}
+                        />
+                        <span className="slider-unit">mi</span>
+                      </div>
+                    </label>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleExportSplitGPX}
+                      disabled={splitting}
+                    >
+                      {splitting ? 'Splitting\u2026' : 'Download Split GPX'}
                     </button>
                     <button
                       className={`btn ${previewing ? 'btn-active' : ''}`}
