@@ -120,6 +120,7 @@ function PreviewLayer({ segments, coords, active, onEnd }: PreviewLayerProps) {
           positions={seg.coords.map(
             ([lng, lat]) => [lat, lng] as [number, number],
           )}
+          smoothFactor={0}
           pathOptions={{
             color: seg.retraced ? '#f59e0b' : '#8b5cf6',
             weight: 5,
@@ -155,6 +156,7 @@ function PreviewLayer({ segments, coords, active, onEnd }: PreviewLayerProps) {
             positions={partial.map(
               ([lng, lat]) => [lat, lng] as [number, number],
             )}
+            smoothFactor={0}
             pathOptions={{
               color: seg.retraced ? '#f59e0b' : '#8b5cf6',
               weight: 5,
