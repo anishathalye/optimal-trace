@@ -42,11 +42,11 @@ export function removeEdgeById(
   return removeLogicalEdge(rawGraph, logicalGraph, edgeId);
 }
 
-export function buildGraphWithRemovals(
-  features: GeoJSONFeature[],
+export function applyRemovals(
+  rawGraph: Graph,
   removedIds: Iterable<string>,
 ): Graph {
-  let raw = buildGraph(features);
+  let raw = rawGraph;
   let logical = pruneGraph(raw);
 
   for (const id of removedIds) {
@@ -54,6 +54,78 @@ export function buildGraphWithRemovals(
     logical = pruneGraph(raw);
   }
 
+  return raw;
+}
+
+export function buildGraphWithRemovals(
+  features: GeoJSONFeature[],
+  removedIds: Iterable<string>,
+): Graph {
+  return applyRemovals(buildGraph(features), removedIds);
+}
+
+// Removes a whole batch of erased ids (logical edge ids, or "physical:"
+// prefixed raw edge ids) against a single logical graph and rebuilds once.
+// This matches applying the ids sequentially as long as the batch does not
+// repeat the same logical edge, which the eraser guarantees within a gesture.
+export function removeBatch(
+  rawGraph: Graph,
+  logicalGraph: Graph | null,
+  removedIds: Iterable<string>,
+): Graph {
+  const removablePairs = new Set<string>();
+  const physicalIds = new Set<string>();
+
+  for (const id of removedIds) {
+    if (id.startsWith(PHYSICAL_EDGE_PREFIX)) {
+      physicalIds.add(id.slice(PHYSICAL_EDGE_PREFIX.length));
+      continue;
+    }
+    if (!logicalGraph) continue;
+
+    const logicalEdge = logicalGraph.edges.find(
+      (e) => edgeIdKey(e.from, e.to) === id,
+    );
+    if (!logicalEdge) continue;
+
+    // Only remove raw edges along the erased logical edge's polyline, i.e.
+    // whose endpoints are CONSECUTIVE vertices, so unrelated chords sharing
+    // two junction vertices are kept.
+    const chain = logicalEdge.coords.map(
+      ([lng, lat]) => `${lat.toFixed(6)},${lng.toFixed(6)}`,
+    );
+    for (let i = 0; i + 1 < chain.length; i++) {
+      removablePairs.add(edgeIdKey(chain[i], chain[i + 1]));
+    }
+  }
+
+  if (removablePairs.size === 0 && physicalIds.size === 0) return rawGraph;
+
+  const newEdges = rawGraph.edges.filter((e) => {
+    const pair = edgeIdKey(e.from, e.to);
+    if (physicalIds.has(pair)) return false;
+    const fromNode = rawGraph.nodes.get(e.from);
+    const toNode = rawGraph.nodes.get(e.to);
+    if (!fromNode || !toNode) return true;
+    const fromKey = `${fromNode.lat.toFixed(6)},${fromNode.lng.toFixed(6)}`;
+    const toKey = `${toNode.lat.toFixed(6)},${toNode.lng.toFixed(6)}`;
+    return !removablePairs.has(edgeIdKey(fromKey, toKey));
+  });
+
+  if (newEdges.length === rawGraph.edges.length) return rawGraph;
+
+  return rebuildGraph(rawGraph, newEdges);
+}
+
+export function applyRemovalBatches(
+  rawGraph: Graph,
+  batches: Iterable<Iterable<string>>,
+): Graph {
+  let raw = rawGraph;
+  for (const batch of batches) {
+    const logical = pruneGraph(raw);
+    raw = removeBatch(raw, logical, batch);
+  }
   return raw;
 }
 

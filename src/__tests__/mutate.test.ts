@@ -4,6 +4,8 @@ import {
   removeRawEdge,
   removeEdgeById,
   buildGraphWithRemovals,
+  removeBatch,
+  applyRemovalBatches,
   addManualEdge,
   addManualEdges,
 } from '../graph/mutate';
@@ -291,6 +293,69 @@ describe('buildGraphWithRemovals', () => {
     const preserved = buildGraphWithRemovals(features, [idCD, idCD]);
     expect(connected(preserved, b, c)).toBe(false);
     expect(preserved.edges.length).toBe(0);
+  });
+});
+
+describe('removeBatch', () => {
+  it('removes several logical edges in one pass', () => {
+    const features = [
+      makeFeature([
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ]),
+      makeFeature([
+        [5, 0],
+        [5.0001, 0],
+        [5.0002, 0],
+      ]),
+    ];
+    const raw = buildGraph(features);
+    const logical = pruneGraph(raw);
+    const idA = edgeKey(pointKey(0, 0), pointKey(0, 2));
+    const idB = edgeKey(pointKey(0, 5), pointKey(0, 5.0002));
+
+    const result = removeBatch(raw, logical, [idA, idB]);
+    expect(result.edges.length).toBe(0);
+  });
+
+  it('removes physical edges by prefixed id', () => {
+    const raw = buildGraph([
+      makeFeature([
+        [0, 0],
+        [1, 0],
+      ]),
+    ]);
+    const logical = pruneGraph(raw);
+    const edge = raw.edges[0];
+    const id = `${PHYSICAL_EDGE_PREFIX}${edgeKey(edge.from, edge.to)}`;
+
+    const result = removeBatch(raw, logical, [id]);
+    expect(result.edges.length).toBe(0);
+  });
+});
+
+describe('applyRemovalBatches', () => {
+  it('applies a repeated logical id once per batch', () => {
+    // Same square-cycle case as buildGraphWithRemovals, but the duplicate id
+    // arrives in two separate erase gestures (batches). Each batch must be
+    // resolved against the graph left by the previous batch.
+    const features = [
+      makeFeature([
+        [0, 0],
+        [0, 2],
+        [2, 2],
+        [2, 0],
+        [0, 0],
+      ]),
+    ];
+    const raw = buildGraph(features);
+    const c = pointKey(2, 2);
+    const d = pointKey(0, 2);
+    const idCD = edgeKey(c, d);
+
+    const result = applyRemovalBatches(raw, [[idCD], [idCD]]);
+    expect(result.edges.length).toBe(0);
   });
 });
 

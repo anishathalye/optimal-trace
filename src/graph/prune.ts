@@ -1,20 +1,8 @@
 import type { Graph, Edge } from './types';
 import { haversineDistance } from '../utils/geo';
 
-function copyGraph(graph: Graph): Graph {
-  const nodes = new Map(graph.nodes);
-  const adjacency = new Map<string, Map<string, number>>();
-  for (const [id, neighbors] of graph.adjacency) {
-    adjacency.set(id, new Map(neighbors));
-  }
-  const edges = graph.edges.map((e) => ({ ...e, coords: [...e.coords] }));
-  return { nodes, edges, adjacency };
-}
-
-function findEdge(graph: Graph, from: string, to: string): Edge | undefined {
-  return graph.edges.find(
-    (e) => (e.from === from && e.to === to) || (e.from === to && e.to === from),
-  );
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 function joinCoords(
@@ -43,115 +31,64 @@ function joinCoords(
 }
 
 export function pruneGraph(input: Graph, preserveKey?: string): Graph {
-  const graph = copyGraph(input);
+  const nodes = new Map(input.nodes);
 
-  // True degree counts every incident edge (parallel edges between the same
-  // node pair each count). Adjacency-key size undercounts on multigraphs.
+  // Active edges, incidence, true degree (parallel edges count individually),
+  // and a count of edges per unordered node pair. Using sets/maps here keeps
+  // edge removal and "is there already an edge between n1 and n2?" O(1),
+  // instead of scanning the edge list (which made pruning O(E^2)).
+  const active = new Set<Edge>();
+  const incident = new Map<string, Set<Edge>>();
   const degree = new Map<string, number>();
-  const incident = new Map<string, Edge[]>();
-  for (const edge of graph.edges) {
+  const pairCount = new Map<string, number>();
+
+  function addActive(edge: Edge) {
+    active.add(edge);
     degree.set(edge.from, (degree.get(edge.from) ?? 0) + 1);
     degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
-    if (!incident.has(edge.from)) incident.set(edge.from, []);
-    if (!incident.has(edge.to)) incident.set(edge.to, []);
-    incident.get(edge.from)!.push(edge);
-    incident.get(edge.to)!.push(edge);
+    if (!incident.has(edge.from)) incident.set(edge.from, new Set());
+    if (!incident.has(edge.to)) incident.set(edge.to, new Set());
+    incident.get(edge.from)!.add(edge);
+    incident.get(edge.to)!.add(edge);
+    const key = pairKey(edge.from, edge.to);
+    pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
   }
 
-  function otherEnd(edge: Edge, nodeId: string): string {
-    return edge.from === nodeId ? edge.to : edge.from;
-  }
-
-  // Keep the adjacency weight equal to the minimum weight among the remaining
-  // edges between a pair (removing one parallel edge may raise the min).
-  function refreshAdjacency(u: string, v: string) {
-    let best: number | undefined;
-    for (const e of incident.get(u) ?? []) {
-      if (otherEnd(e, u) !== v) continue;
-      if (best === undefined || e.weight < best) best = e.weight;
-    }
-    const mapU = graph.adjacency.get(u);
-    const mapV = graph.adjacency.get(v);
-    if (best === undefined) {
-      mapU?.delete(v);
-      if (mapU?.size === 0) graph.adjacency.delete(u);
-      mapV?.delete(u);
-      if (mapV?.size === 0) graph.adjacency.delete(v);
-    } else {
-      mapU?.set(v, best);
-      mapV?.set(u, best);
-    }
-  }
-
-  function removeEdge(edge: Edge) {
-    const idx = graph.edges.indexOf(edge);
-    if (idx >= 0) graph.edges.splice(idx, 1);
-
+  function removeActive(edge: Edge) {
+    if (!active.delete(edge)) return;
     for (const end of [edge.from, edge.to]) {
-      const list = incident.get(end);
-      if (list) {
-        const i = list.indexOf(edge);
-        if (i >= 0) list.splice(i, 1);
-      }
+      incident.get(end)?.delete(edge);
       const d = (degree.get(end) ?? 1) - 1;
       if (d <= 0) degree.delete(end);
       else degree.set(end, d);
     }
-
-    refreshAdjacency(edge.from, edge.to);
+    const key = pairKey(edge.from, edge.to);
+    const count = (pairCount.get(key) ?? 1) - 1;
+    if (count <= 0) pairCount.delete(key);
+    else pairCount.set(key, count);
   }
 
-  function addEdge(
-    from: string,
-    to: string,
-    coords: [number, number][],
-    weight: number,
-  ) {
-    const edge: Edge = { from, to, weight, coords };
-    graph.edges.push(edge);
-
-    degree.set(from, (degree.get(from) ?? 0) + 1);
-    degree.set(to, (degree.get(to) ?? 0) + 1);
-    if (!incident.has(from)) incident.set(from, []);
-    if (!incident.has(to)) incident.set(to, []);
-    incident.get(from)!.push(edge);
-    incident.get(to)!.push(edge);
-
-    if (!graph.adjacency.has(from)) graph.adjacency.set(from, new Map());
-    if (!graph.adjacency.has(to)) graph.adjacency.set(to, new Map());
-
-    const existing = graph.adjacency.get(from)!.get(to);
-    if (existing === undefined || weight < existing) {
-      graph.adjacency.get(from)!.set(to, weight);
-      graph.adjacency.get(to)!.set(from, weight);
-    }
-  }
+  for (const edge of input.edges) addActive(edge);
 
   let changed = true;
 
   while (changed) {
     changed = false;
 
-    const degree2Nodes: string[] = [];
-    for (const id of graph.nodes.keys()) {
-      if (degree.get(id) === 2 && !(preserveKey && id === preserveKey)) {
-        degree2Nodes.push(id);
-      }
-    }
-
-    for (const nodeId of degree2Nodes) {
+    for (const nodeId of [...nodes.keys()]) {
+      if (preserveKey && nodeId === preserveKey) continue;
       if (degree.get(nodeId) !== 2) continue;
 
-      const edgesAtNode = incident.get(nodeId) ?? [];
-      if (edgesAtNode.length !== 2) continue;
+      const edgesAtNode = incident.get(nodeId);
+      if (!edgesAtNode || edgesAtNode.size !== 2) continue;
 
-      const [e1, e2] = edgesAtNode;
-      const n1 = otherEnd(e1, nodeId);
-      const n2 = otherEnd(e2, nodeId);
+      const [e1, e2] = [...edgesAtNode];
+      const n1 = e1.from === nodeId ? e1.to : e1.from;
+      const n2 = e2.from === nodeId ? e2.to : e2.from;
 
       if (n1 === n2) continue;
 
-      if (findEdge(graph, n1, n2)) continue;
+      if (pairCount.has(pairKey(n1, n2))) continue;
 
       const combinedCoords = joinCoords(e1, e2, nodeId);
       let combinedWeight = 0;
@@ -164,15 +101,37 @@ export function pruneGraph(input: Graph, preserveKey?: string): Graph {
         );
       }
 
-      removeEdge(e1);
-      removeEdge(e2);
-      graph.nodes.delete(nodeId);
+      removeActive(e1);
+      removeActive(e2);
+      nodes.delete(nodeId);
 
-      addEdge(n1, n2, combinedCoords, combinedWeight);
+      addActive({
+        from: n1,
+        to: n2,
+        weight: combinedWeight,
+        coords: combinedCoords,
+      });
 
       changed = true;
     }
   }
 
-  return graph;
+  const edges = [...active];
+  const adjacency = new Map<string, Map<string, number>>();
+  for (const edge of edges) {
+    if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Map());
+    if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Map());
+    const fromMap = adjacency.get(edge.from)!;
+    const existing = fromMap.get(edge.to);
+    if (existing === undefined || edge.weight < existing) {
+      fromMap.set(edge.to, edge.weight);
+      adjacency.get(edge.to)!.set(edge.from, edge.weight);
+    }
+  }
+
+  for (const id of [...nodes.keys()]) {
+    if (!adjacency.has(id)) nodes.delete(id);
+  }
+
+  return { nodes, edges, adjacency };
 }

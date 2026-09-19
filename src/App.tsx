@@ -36,7 +36,8 @@ import {
   type ElevationPoint,
 } from './elevation/api';
 import ElevationProfile from './components/ElevationProfile';
-import { addManualEdges, buildGraphWithRemovals } from './graph/mutate';
+import { addManualEdges, applyRemovals, removeBatch } from './graph/mutate';
+import buildGraph from './graph/build';
 
 const VIEW_KEY = 'optimal-trace-view';
 const SAVED_SELECTIONS_KEY = 'optimal-trace-selections';
@@ -163,11 +164,24 @@ function App() {
     useState<Record<string, SavedSelection>>(loadSavedSelections);
   const [saveName, setSaveName] = useState('');
   const [erasing, setErasing] = useState(false);
+  const [eraseGestureActive, setEraseGestureActive] = useState(false);
+  const [liveErasedIds, setLiveErasedIds] = useState<Set<string>>(new Set());
   const [addingTrail, setAddingTrail] = useState(false);
   const [addedTrails, setAddedTrails] = useState<ManualConnector[]>([]);
   const addedTrailIdRef = useRef(0);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [buildingGraph, setBuildingGraph] = useState(false);
+  const baseGraphRef = useRef<{
+    source: GeoJSONFeatureCollection['features'];
+    graph: Graph;
+  } | null>(null);
+  const removalCacheRef = useRef<{
+    base: Graph;
+    raw: Graph;
+    logical: Graph;
+    appliedBatches: number;
+    batches: string[][];
+  } | null>(null);
   const [selectingStart, setSelectingStart] = useState(false);
   const [startLat, setStartLat] = useState<number | null>(null);
   const [startLng, setStartLng] = useState<number | null>(null);
@@ -280,27 +294,79 @@ function App() {
     return displayTrails;
   }, [eraserMode, graph, displayTrails]);
 
-  // The graph is always derived from (rawTrails, removedBatches) so that
-  // erase/undo/restore stay consistent. Duplicates in the flattened list are
-  // meaningful: buildGraphWithRemovals must replay every occurrence in order.
+  // The graph is derived from (rawTrails, removedBatches). The expensive
+  // build (segment noding/intersections) runs once per fetched dataset and is
+  // cached. Removal batches are applied incrementally on top of the previous
+  // result, one prune per batch, so erasing no longer replays every prior
+  // removal. While an erase gesture is in progress the graph is left untouched
+  // so dragging does not tear down and rebuild the whole trail layer; the
+  // accumulated batch is applied once on release.
   useEffect(() => {
-    if (!rawTrails) return;
+    if (!rawTrails || eraseGestureActive) return;
     setBuildingGraph(true);
-    const timer = setTimeout(() => {
-      try {
+    try {
+      let base = baseGraphRef.current;
+      if (!base || base.source !== rawTrails.features) {
+        base = {
+          source: rawTrails.features,
+          graph: buildGraph(rawTrails.features),
+        };
+        baseGraphRef.current = base;
+        removalCacheRef.current = null;
+      }
+
+      let cache = removalCacheRef.current;
+      if (
+        !cache ||
+        cache.base !== base.graph ||
+        cache.appliedBatches > removedBatches.length ||
+        !cache.batches
+          .slice(0, cache.appliedBatches)
+          .every((batch, i) => batch === removedBatches[i])
+      ) {
+        // Full rebuild (new dataset, load, undo, restore): replay the ids
+        // sequentially, exactly as the pre-cache implementation did, so
+        // previously saved selections rebuild identically. Batches that are
+        // merely appended during a gesture use the faster path below.
         const allRemoved: string[] = [];
         for (const batch of removedBatches) {
           for (const id of batch) allRemoved.push(id);
         }
-        setGraph(buildGraphWithRemovals(rawTrails.features, allRemoved));
-        setCppResult(null);
-      } catch (err) {
-        console.error('Graph build failed:', err);
+        const raw = applyRemovals(base.graph, allRemoved);
+        cache = {
+          base: base.graph,
+          raw,
+          logical: pruneGraph(raw),
+          appliedBatches: removedBatches.length,
+          batches: removedBatches,
+        };
+      } else {
+        for (let b = cache.appliedBatches; b < removedBatches.length; b++) {
+          const batch = removedBatches[b];
+          if (batch.length > 0) {
+            const nextRaw = removeBatch(cache.raw, cache.logical, batch);
+            if (nextRaw !== cache.raw) {
+              cache.raw = nextRaw;
+              cache.logical = pruneGraph(nextRaw);
+            }
+          }
+          cache.appliedBatches = b + 1;
+        }
+        cache.batches = removedBatches;
       }
-      setBuildingGraph(false);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [rawTrails, removedBatches]);
+
+      removalCacheRef.current = cache;
+
+      setGraph(cache.raw);
+      // The rebuilt data no longer contains the erased features, so drop the
+      // live-hide set in the same commit to avoid a flash of stale layers.
+      setLiveErasedIds((prev) => (prev.size === 0 ? prev : new Set()));
+      setCppResult(null);
+    } catch (err) {
+      console.error('Graph build failed:', err);
+    }
+    setBuildingGraph(false);
+  }, [rawTrails, removedBatches, eraseGestureActive]);
 
   const graphStats = useMemo(() => {
     if (!graph || !logicalGraph) return null;
@@ -485,10 +551,22 @@ function App() {
   }, []);
 
   const handleEraseStart = useCallback(() => {
+    setEraseGestureActive(true);
+    setLiveErasedIds(new Set());
     setRemovedBatches((prev) => [...prev, []]);
   }, []);
 
+  const handleEraseEnd = useCallback(() => {
+    setEraseGestureActive(false);
+  }, []);
+
   const handleEraseFeature = useCallback((featureId: string) => {
+    setLiveErasedIds((prev) => {
+      if (prev.has(featureId)) return prev;
+      const next = new Set(prev);
+      next.add(featureId);
+      return next;
+    });
     setRemovedBatches((prev) => {
       const last = [...(prev[prev.length - 1] ?? [])];
       last.push(featureId);
@@ -799,6 +877,7 @@ function App() {
             bbox={rawTrails ? null : bbox}
             polygonCoords={rawTrails ? null : polygonCoords}
             trails={displayTrails}
+            hiddenTrailIds={liveErasedIds}
             eraserTrails={eraserTrails}
             graph={debugGraph}
             rawGraph={graph}
@@ -820,6 +899,7 @@ function App() {
             onStartNodeSelected={handleStartNodeSelected}
             onEraseStart={handleEraseStart}
             onEraseFeature={handleEraseFeature}
+            onEraseEnd={handleEraseEnd}
             center={center}
             zoom={zoom}
           />

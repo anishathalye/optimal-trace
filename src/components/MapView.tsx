@@ -171,6 +171,7 @@ interface MapViewProps {
   drawMode: DrawMode;
   bbox: Bbox | null;
   trails: GeoJSONFeatureCollection | null;
+  hiddenTrailIds: ReadonlySet<string>;
   eraserTrails: GeoJSONFeatureCollection | null;
   graph: Graph | null;
   rawGraph: Graph | null;
@@ -193,6 +194,7 @@ interface MapViewProps {
   onStartNodeSelected: (lat: number, lng: number) => void;
   onEraseFeature: (featureId: string) => void;
   onEraseStart: () => void;
+  onEraseEnd: () => void;
   center: [number, number];
   zoom: number;
 }
@@ -203,6 +205,7 @@ function MapView({
   bbox,
   polygonCoords,
   trails,
+  hiddenTrailIds,
   eraserTrails,
   graph,
   rawGraph,
@@ -224,6 +227,7 @@ function MapView({
   onStartNodeSelected,
   onEraseStart,
   onEraseFeature,
+  onEraseEnd,
   center,
   zoom,
 }: MapViewProps) {
@@ -258,6 +262,7 @@ function MapView({
       {trails && (
         <TrailLayer
           trails={trails}
+          hiddenIds={hiddenTrailIds}
           onFeatureClick={onFeatureClick}
           disableClicks={selectingStart || erasing || addingTrail}
         />
@@ -268,6 +273,7 @@ function MapView({
           trails={eraserTrails}
           onEraseStart={onEraseStart}
           onEraseFeature={onEraseFeature}
+          onEraseEnd={onEraseEnd}
         />
       )}
       {addedTrails.map((trail) => (
