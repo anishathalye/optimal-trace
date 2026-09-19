@@ -171,6 +171,17 @@
   color: #333;
 }
 
+.btn-secondary.btn-active {
+  background: #4a6fa5;
+  color: #fff;
+  border-color: #3a5a8c;
+}
+
+.btn-secondary.btn-active:hover {
+  background: #3a5a8c;
+  color: #fff;
+}
+
 .btn-primary {
   background: #4a6fa5;
   color: #fff;
