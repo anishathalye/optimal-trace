@@ -13,3 +13,7 @@ npm install
 npm test
 npm run dev
 ```
+
+## License
+
+Copyright (c) Anish Athalye. Released under the MIT License. See [LICENSE.md](LICENSE.md) for details.
