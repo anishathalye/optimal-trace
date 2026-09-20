@@ -1,23 +1,15 @@
-# Optimal Trace
+# Optimal Trace [![Build Status](https://github.com/anishathalye/optimal-trace/actions/workflows/ci.yml/badge.svg)](https://github.com/anishathalye/optimal-trace/actions/workflows/ci.yml)
 
-Chinese Postman route planner for trails and roads.
+Route planner for optimal traces. Read more in the [blog post](https://anishathalye.com/optimal-trace/). Use the app at [optimal-trace.anish.io](https://optimal-trace.anish.io/).
 
-## Usage
+<p align="center">
+<img src="https://github.com/anishathalye/assets/blob/master/optimal-trace/angel-island-trace.png" alt="Optimal Trace demo">
+</p>
+
+## Development
 
 ```bash
 npm install
-npm run dev
-```
-
-1. Click **Select Area** and draw a rectangle on the map
-2. Click **Fetch Trails**
-3. Optionally erase unwanted segments with the **Erase** tool or by clicking
-4. Click **Set Start Point** and pick a starting location
-5. Click **Compute Route** to generate an optimal trail-covering route
-6. Click **Download GPX** to export
-
-## Tests
-
-```bash
 npm test
+npm run dev
 ```
