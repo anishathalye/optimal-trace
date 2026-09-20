@@ -3,9 +3,16 @@ import './App.css';
 import MapView from './components/MapView';
 import type { Bbox, DrawMode } from './components/DrawControl';
 import { useOverpass } from './hooks/useOverpass';
-import type { GeoJSONFeatureCollection } from './hooks/useOverpass';
+import type {
+  GeoJSONFeatureCollection,
+  GeoJSONFeature,
+} from './hooks/useOverpass';
 import { trailDistance, trailCount, haversineDistance } from './utils/geo';
-import { graphToFeatures, graphToPhysicalFeatures } from './graph/features';
+import {
+  graphToFeatures,
+  graphToPhysicalFeatures,
+  featureToPhysicalEdgeIds,
+} from './graph/features';
 import { pruneGraph } from './graph/prune';
 import type { Graph, ManualConnector } from './graph/types';
 import { pointKey, edgeIdKey } from './graph/types';
@@ -58,6 +65,16 @@ interface SavedSelection {
 }
 
 type EraserMode = 'logical' | 'physical';
+
+function buildFeatureIndex(
+  collection: GeoJSONFeatureCollection | null,
+): Map<string, GeoJSONFeature> {
+  const map = new Map<string, GeoJSONFeature>();
+  for (const feature of collection?.features ?? []) {
+    if (feature.id != null) map.set(String(feature.id), feature);
+  }
+  return map;
+}
 
 function loadSavedSelections(): Record<string, SavedSelection> {
   try {
@@ -294,6 +311,15 @@ function App() {
     return displayTrails;
   }, [eraserMode, graph, displayTrails]);
 
+  const displayFeaturesById = useMemo(
+    () => buildFeatureIndex(displayTrails),
+    [displayTrails],
+  );
+  const eraserFeaturesById = useMemo(
+    () => buildFeatureIndex(eraserTrails),
+    [eraserTrails],
+  );
+
   // The graph is derived from (rawTrails, removedBatches). The expensive
   // build (segment noding/intersections) runs once per fetched dataset and is
   // cached. Removal batches are applied incrementally on top of the previous
@@ -478,10 +504,17 @@ function App() {
     [bbox, rawTrails, polygonCoords, includeRoads, fetchTrails],
   );
 
-  const handleFeatureClick = useCallback((featureId: string) => {
-    setRemovedBatches((prev) => [...prev, [featureId]]);
-    setCppResult(null);
-  }, []);
+  const handleFeatureClick = useCallback(
+    (featureId: string) => {
+      const ids = featureToPhysicalEdgeIds(
+        displayFeaturesById.get(featureId),
+        featureId,
+      );
+      setRemovedBatches((prev) => [...prev, ids]);
+      setCppResult(null);
+    },
+    [displayFeaturesById],
+  );
 
   const handleRestoreRemoved = useCallback(() => {
     setRemovedBatches([]);
@@ -560,20 +593,29 @@ function App() {
     setEraseGestureActive(false);
   }, []);
 
-  const handleEraseFeature = useCallback((featureId: string) => {
-    setLiveErasedIds((prev) => {
-      if (prev.has(featureId)) return prev;
-      const next = new Set(prev);
-      next.add(featureId);
-      return next;
-    });
-    setRemovedBatches((prev) => {
-      const last = [...(prev[prev.length - 1] ?? [])];
-      last.push(featureId);
-      return [...prev.slice(0, -1), last];
-    });
-    setCppResult(null);
-  }, []);
+  const handleEraseFeature = useCallback(
+    (featureId: string) => {
+      const ids = featureToPhysicalEdgeIds(
+        eraserFeaturesById.get(featureId),
+        featureId,
+      );
+      setLiveErasedIds((prev) => {
+        if (prev.has(featureId)) return prev;
+        const next = new Set(prev);
+        next.add(featureId);
+        return next;
+      });
+      setRemovedBatches((prev) => {
+        const last = [...(prev[prev.length - 1] ?? [])];
+        for (const id of ids) {
+          if (!last.includes(id)) last.push(id);
+        }
+        return [...prev.slice(0, -1), last];
+      });
+      setCppResult(null);
+    },
+    [eraserFeaturesById],
+  );
 
   const handleToggleSelectStart = useCallback(() => {
     setSelectingStart((prev) => {
